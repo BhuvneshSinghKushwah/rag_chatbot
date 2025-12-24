@@ -1,9 +1,6 @@
-import json
-from typing import Optional
-
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.db import get_db
 from app.db.redis import get_redis, RedisCache
@@ -15,6 +12,8 @@ from app.models.chat import (
     ChatHistoryResponse,
     ChatHistoryMessage,
     WebSocketMessage,
+    ConversationSummary,
+    ConversationsListResponse,
 )
 from app.services.chat import get_chat_service
 from app.services.rate_limiter import RateLimiter
@@ -43,7 +42,7 @@ async def websocket_chat(
     rate_limiter = RateLimiter(cache, settings.RATE_LIMIT_SALT)
     chat_service = get_chat_service()
 
-    user_id = rate_limiter.generate_user_id(fingerprint, websocket)
+    user_id = await rate_limiter.resolve_user_id(fingerprint, websocket)
 
     try:
         while True:
@@ -57,21 +56,22 @@ async def websocket_chat(
                 )
                 continue
 
-            rate_check = await rate_limiter.check_rate_limit(user_id)
+            rate_check = await rate_limiter.check_rate_limit(fingerprint, websocket)
             if not rate_check["allowed"]:
                 await websocket.send_json(
                     WebSocketMessage(
-                        type="error",
-                        message=f"Rate limit exceeded. Retry after {rate_check.get('retry_after', 60)} seconds"
+                        type="rate_limited",
+                        message=f"Rate limit exceeded. Retry after {rate_check.get('retry_after', 60)} seconds",
+                        retry_after=rate_check.get("retry_after", 60),
+                        limits=rate_check["limits"],
                     ).model_dump()
                 )
                 continue
 
-            await rate_limiter.increment(user_id)
+            await rate_limiter.increment(fingerprint, websocket)
 
             try:
-                sources = None
-                async for chunk, chunk_sources in chat_service.chat_stream(
+                async for chunk in chat_service.chat_stream(
                     db=db,
                     message=content,
                     session_id=session_id,
@@ -81,11 +81,9 @@ async def websocket_chat(
                         await websocket.send_json(
                             WebSocketMessage(type="token", content=chunk).model_dump()
                         )
-                    if chunk_sources is not None:
-                        sources = chunk_sources
 
                 await websocket.send_json(
-                    WebSocketMessage(type="complete", sources=sources or []).model_dump()
+                    WebSocketMessage(type="complete").model_dump()
                 )
 
             except Exception as e:
@@ -104,9 +102,8 @@ async def chat(
     db: AsyncSession = Depends(get_db),
 ):
     rate_limiter = await get_rate_limiter()
-    user_id = rate_limiter.generate_user_id(chat_request.fingerprint, request)
 
-    rate_check = await rate_limiter.check_rate_limit(user_id)
+    rate_check = await rate_limiter.check_rate_limit(chat_request.fingerprint, request)
     if not rate_check["allowed"]:
         raise HTTPException(
             status_code=429,
@@ -118,11 +115,12 @@ async def chat(
             headers={"Retry-After": str(rate_check.get("retry_after", 60))},
         )
 
-    await rate_limiter.increment(user_id)
+    user_id = rate_check["user_id"]
+    await rate_limiter.increment(chat_request.fingerprint, request)
 
     chat_service = get_chat_service()
 
-    response, sources, memory_updated = await chat_service.chat(
+    response, memory_updated = await chat_service.chat(
         db=db,
         message=chat_request.message,
         session_id=chat_request.session_id,
@@ -131,7 +129,6 @@ async def chat(
 
     return ChatResponse(
         response=response,
-        sources=sources,
         session_id=chat_request.session_id,
         user_id=user_id,
         memory_updated=memory_updated,
@@ -146,7 +143,7 @@ async def get_chat_history(
     db: AsyncSession = Depends(get_db),
 ):
     rate_limiter = await get_rate_limiter()
-    user_id = rate_limiter.generate_user_id(fingerprint, request)
+    user_id = await rate_limiter.resolve_user_id(fingerprint, request)
 
     result = await db.execute(
         select(Conversation).where(
@@ -173,9 +170,54 @@ async def get_chat_history(
                 id=msg.id,
                 role=msg.role,
                 content=msg.content,
-                sources=json.loads(msg.sources) if msg.sources else None,
                 created_at=msg.created_at,
             )
             for msg in messages
         ],
     )
+
+
+@router.get("/conversations", response_model=ConversationsListResponse)
+async def list_conversations(
+    fingerprint: str = Query(...),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+):
+    rate_limiter = await get_rate_limiter()
+    user_id = await rate_limiter.resolve_user_id(fingerprint, request)
+
+    result = await db.execute(
+        select(Conversation)
+        .where(Conversation.user_id == user_id)
+        .order_by(Conversation.updated_at.desc())
+    )
+    conversations = result.scalars().all()
+
+    summaries = []
+    for conv in conversations:
+        msg_result = await db.execute(
+            select(func.count(Message.id)).where(Message.conversation_id == conv.id)
+        )
+        message_count = msg_result.scalar() or 0
+
+        first_msg_result = await db.execute(
+            select(Message)
+            .where(Message.conversation_id == conv.id, Message.role == "user")
+            .order_by(Message.created_at.asc())
+            .limit(1)
+        )
+        first_msg = first_msg_result.scalar_one_or_none()
+        preview = first_msg.content[:100] if first_msg else "New conversation"
+
+        summaries.append(
+            ConversationSummary(
+                id=conv.id,
+                session_id=conv.session_id,
+                preview=preview,
+                message_count=message_count,
+                created_at=conv.created_at,
+                updated_at=conv.updated_at,
+            )
+        )
+
+    return ConversationsListResponse(conversations=summaries, total=len(summaries))

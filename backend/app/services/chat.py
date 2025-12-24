@@ -1,5 +1,4 @@
 from typing import Optional, AsyncIterator
-import json
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,20 +9,22 @@ from app.services.qdrant import get_qdrant_service
 from app.db.postgres import Conversation, Message
 
 
-SYSTEM_PROMPT = """You are a friendly customer support representative.
+SYSTEM_PROMPT = """
+
+Role: You are a friendly, helpful, and concise customer support representative.
 
 Perspective:
-- You represent the company: use "we", "our", "us"
-- Address the customer: use "you", "your"
-- Never say "the company" or "the customer"
+- You represent our team: always use "we", "our", and "us".
+- Address the user directly: always use "you" and "your".
+- Prohibited Terms: Never use the phrases "the company" or "the customer".
 
-Tone: Warm, helpful, and concise.
+Strict Response Guidelines:
+1. Exact Accuracy: State facts exactly as written in the <knowledge_base>. 
+2. No Modification: Do not infer, combine, or rephrase facts. If the information is not present, politely state that we do not have that information.
+3. Date/Year Protocol: If asked about a specific date or year, quote only the text associated with that date/year verbatim.
+4. History Access: You are permitted to share details from the <customer_history> with the user if they ask about information they have previously shared.
 
-Rules:
-- Only state facts exactly as written in the knowledge base
-- Do not infer, combine, or rephrase facts
-- If asked about a specific date/year, quote only what that date/year says
-
+Context:
 <knowledge_base>
 {rag_context}
 </knowledge_base>
@@ -31,6 +32,9 @@ Rules:
 <customer_history>
 {memory_context}
 </customer_history>
+
+Execution: Process the user's request by strictly following the rules above.
+
 """
 
 
@@ -40,25 +44,19 @@ class ChatService:
         self.memory = get_memory_service()
         self.qdrant = get_qdrant_service()
 
-    async def _get_rag_context(self, query: str, limit: int = 5) -> tuple[str, list[str]]:
+    async def _get_rag_context(self, query: str, limit: int = 5) -> str:
         results = await self.qdrant.search(query=query, limit=limit)
 
         if not results:
-            return "", []
+            return ""
 
         context_parts = []
-        sources = []
-
         for result in results:
             content = result.get("content", "")
-            doc_id = result.get("document_id", "")
-
             if content:
                 context_parts.append(content)
-                if doc_id and doc_id not in sources:
-                    sources.append(doc_id)
 
-        return "\n\n".join(context_parts), sources
+        return "\n\n".join(context_parts)
 
     def _get_memory_context(self, query: str, user_id: str) -> str:
         return self.memory.get_context(
@@ -116,13 +114,11 @@ class ChatService:
         conversation_id,
         role: str,
         content: str,
-        sources: Optional[list[str]] = None,
     ) -> Message:
         message = Message(
             conversation_id=conversation_id,
             role=role,
             content=content,
-            sources=json.dumps(sources) if sources else None,
         )
         db.add(message)
         await db.commit()
@@ -166,8 +162,8 @@ class ChatService:
         session_id: str,
         user_id: str,
         provider: Optional[str] = None,
-    ) -> tuple[str, list[str], bool]:
-        rag_context, sources = await self._get_rag_context(message)
+    ) -> tuple[str, bool]:
+        rag_context = await self._get_rag_context(message)
         memory_context = self._get_memory_context(message, user_id)
         system_prompt = self._build_system_prompt(rag_context, memory_context)
 
@@ -183,11 +179,11 @@ class ChatService:
 
         conversation = await self.get_or_create_conversation(db, session_id, user_id)
         await self.save_message(db, conversation.id, "user", message)
-        await self.save_message(db, conversation.id, "assistant", response, sources)
+        await self.save_message(db, conversation.id, "assistant", response)
 
         memory_updated = await self._update_memory(user_id, message, response)
 
-        return response, sources, memory_updated
+        return response, memory_updated
 
     async def chat_stream(
         self,
@@ -196,8 +192,8 @@ class ChatService:
         session_id: str,
         user_id: str,
         provider: Optional[str] = None,
-    ) -> AsyncIterator[tuple[str, Optional[list[str]]]]:
-        rag_context, sources = await self._get_rag_context(message)
+    ) -> AsyncIterator[str]:
+        rag_context = await self._get_rag_context(message)
         memory_context = self._get_memory_context(message, user_id)
         system_prompt = self._build_system_prompt(rag_context, memory_context)
 
@@ -213,15 +209,13 @@ class ChatService:
 
         async for chunk in self.llm.stream(messages, provider):
             full_response += chunk
-            yield chunk, None
+            yield chunk
 
         conversation = await self.get_or_create_conversation(db, session_id, user_id)
         await self.save_message(db, conversation.id, "user", message)
-        await self.save_message(db, conversation.id, "assistant", full_response, sources)
+        await self.save_message(db, conversation.id, "assistant", full_response)
 
         await self._update_memory(user_id, message, full_response)
-
-        yield "", sources
 
 
 _chat_service: Optional[ChatService] = None

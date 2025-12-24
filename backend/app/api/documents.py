@@ -2,7 +2,10 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
+from pathlib import Path
+
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Header
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,11 +25,9 @@ from app.services.qdrant import get_qdrant_service
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 settings = get_settings()
 
-ADMIN_API_KEY = "admin-secret-key"
-
 
 def verify_admin_key(x_admin_key: Optional[str] = Header(None)) -> str:
-    if x_admin_key != ADMIN_API_KEY:
+    if x_admin_key != settings.ADMIN_API_KEY:
         raise HTTPException(status_code=403, detail="Invalid admin key")
     return x_admin_key
 
@@ -38,7 +39,6 @@ async def list_documents(db: AsyncSession = Depends(get_db)):
         .where(
             Document.visibility == "global",
             Document.deleted_at.is_(None),
-            Document.status == "ready",
         )
         .order_by(Document.created_at.desc())
     )
@@ -158,6 +158,40 @@ async def upload_document(
         document.error_message = str(e)
         await db.commit()
         raise HTTPException(status_code=500, detail=f"Processing failed: {e}")
+
+
+@router.get("/{document_id}/content")
+async def get_document_content(
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    query = select(Document).where(
+        Document.id == document_id,
+        Document.deleted_at.is_(None),
+    )
+    result = await db.execute(query)
+    document = result.scalar_one_or_none()
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    file_path = Path(document.storage_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    media_types = {
+        "pdf": "application/pdf",
+        "txt": "text/plain",
+        "md": "text/markdown",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
+    media_type = media_types.get(document.file_type, "application/octet-stream")
+
+    return FileResponse(
+        path=file_path,
+        filename=document.original_filename,
+        media_type=media_type,
+    )
 
 
 @router.delete("/{document_id}")

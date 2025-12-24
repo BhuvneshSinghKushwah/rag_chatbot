@@ -1,10 +1,14 @@
 import hashlib
+import uuid
 from typing import Optional, Union
 
 from fastapi import Request, WebSocket
 
 from app.db.redis import RedisCache
 from app.config import get_settings
+
+FP_TTL = 90 * 24 * 3600
+IP_TTL = 7 * 24 * 3600
 
 
 class RateLimiter:
@@ -18,31 +22,60 @@ class RateLimiter:
             "per_day": settings.RATE_LIMIT_PER_DAY,
         }
 
-    def generate_user_id(self, client_fingerprint: str, request: Union[Request, WebSocket]) -> str:
-        ip = self._get_client_ip(request)
-        user_agent = request.headers.get("user-agent", "")
-        accept_lang = request.headers.get("accept-language", "")
-
-        combined = f"{client_fingerprint}|{ip}|{user_agent}|{accept_lang}|{self.salt}"
-        user_id = hashlib.sha256(combined.encode()).hexdigest()[:32]
-        return user_id
+    def _hash(self, value: str) -> str:
+        combined = f"{value}|{self.salt}"
+        return hashlib.sha256(combined.encode()).hexdigest()[:32]
 
     def _get_client_ip(self, request: Union[Request, WebSocket]) -> str:
+        if not request:
+            return "unknown"
         forwarded = request.headers.get("x-forwarded-for")
         if forwarded:
             return forwarded.split(",")[0].strip()
-
         real_ip = request.headers.get("x-real-ip")
         if real_ip:
             return real_ip
-
         return request.client.host if request.client else "unknown"
 
-    async def check_rate_limit(self, user_id: str) -> dict:
+    async def resolve_user_id(
+        self, fingerprint: str, request: Union[Request, WebSocket]
+    ) -> str:
+        ip = self._get_client_ip(request)
+        fp_hash = self._hash(fingerprint)
+        ip_hash = self._hash(ip)
+
+        fp_key = f"user:fp:{fp_hash}"
+        ip_key = f"user:ip:{ip_hash}"
+
+        user_id_from_fp = await self.redis.get(fp_key)
+        user_id_from_ip = await self.redis.get(ip_key)
+
+        if user_id_from_fp:
+            user_id = user_id_from_fp
+            await self.redis.set(ip_key, user_id, expire=IP_TTL)
+        elif user_id_from_ip:
+            user_id = user_id_from_ip
+            await self.redis.set(fp_key, user_id, expire=FP_TTL)
+        else:
+            user_id = uuid.uuid4().hex[:32]
+            await self.redis.set(fp_key, user_id, expire=FP_TTL)
+            await self.redis.set(ip_key, user_id, expire=IP_TTL)
+
+        return user_id
+
+    async def check_rate_limit(
+        self, fingerprint: str, request: Union[Request, WebSocket]
+    ) -> dict:
+        ip = self._get_client_ip(request)
+        fp_hash = self._hash(fingerprint)
+        ip_hash = self._hash(ip)
+
+        user_id = await self.resolve_user_id(fingerprint, request)
+
         results = {
             "allowed": True,
             "user_id": user_id,
-            "limits": {}
+            "limits": {},
         }
 
         windows = [
@@ -52,24 +85,34 @@ class RateLimiter:
         ]
 
         for limit_name, window_seconds in windows:
-            key = f"ratelimit:{user_id}:{limit_name}"
-            current = await self.redis.get(key)
-            current_count = int(current) if current else 0
+            fp_key = f"ratelimit:fp:{fp_hash}:{limit_name}"
+            ip_key = f"ratelimit:ip:{ip_hash}:{limit_name}"
+
+            fp_count = int(await self.redis.get(fp_key) or 0)
+            ip_count = int(await self.redis.get(ip_key) or 0)
             max_allowed = self.limits[limit_name]
+
+            current_count = max(fp_count, ip_count)
 
             results["limits"][limit_name] = {
                 "current": current_count,
                 "max": max_allowed,
-                "remaining": max(0, max_allowed - current_count)
+                "remaining": max(0, max_allowed - current_count),
             }
 
-            if current_count >= max_allowed:
+            if fp_count >= max_allowed or ip_count >= max_allowed:
                 results["allowed"] = False
-                results["retry_after"] = await self.redis.ttl(key)
+                fp_ttl = await self.redis.ttl(fp_key)
+                ip_ttl = await self.redis.ttl(ip_key)
+                results["retry_after"] = max(fp_ttl or 0, ip_ttl or 0)
 
         return results
 
-    async def increment(self, user_id: str):
+    async def increment(self, fingerprint: str, request: Union[Request, WebSocket]):
+        ip = self._get_client_ip(request)
+        fp_hash = self._hash(fingerprint)
+        ip_hash = self._hash(ip)
+
         windows = [
             ("per_minute", 60),
             ("per_hour", 3600),
@@ -77,12 +120,18 @@ class RateLimiter:
         ]
 
         for limit_name, window_seconds in windows:
-            key = f"ratelimit:{user_id}:{limit_name}"
-            await self.redis.incr(key)
-            await self.redis.expire(key, window_seconds)
+            fp_key = f"ratelimit:fp:{fp_hash}:{limit_name}"
+            ip_key = f"ratelimit:ip:{ip_hash}:{limit_name}"
 
-    async def get_rate_limit_headers(self, user_id: str) -> dict:
-        result = await self.check_rate_limit(user_id)
+            await self.redis.incr(fp_key)
+            await self.redis.expire(fp_key, window_seconds)
+            await self.redis.incr(ip_key)
+            await self.redis.expire(ip_key, window_seconds)
+
+    async def get_rate_limit_headers(
+        self, fingerprint: str, request: Union[Request, WebSocket]
+    ) -> dict:
+        result = await self.check_rate_limit(fingerprint, request)
         headers = {}
         for limit_name, info in result["limits"].items():
             header_suffix = limit_name.replace("per_", "").capitalize()

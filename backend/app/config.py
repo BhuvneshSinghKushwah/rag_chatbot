@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     QDRANT_HOST: str = "localhost"
     QDRANT_HTTP_PORT: int = 6333
 
+    ADMIN_API_KEY: str = "admin-secret-key"
+
     RATE_LIMIT_SALT: str = "change_this_to_random_secret"
     RATE_LIMIT_PER_MINUTE: int = 10
     RATE_LIMIT_PER_HOUR: int = 100
