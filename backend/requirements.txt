@@ -3,13 +3,32 @@ fastapi
 uvicorn[standard]
 pydantic
 pydantic-settings
-aiohttp
+python-multipart
 
-# LangChain Core
+# Database
+sqlalchemy[asyncio]
+asyncpg
+redis
+
+# Vector Store
+qdrant-client
+
+# Embeddings
+httpx
+
+# LangChain
 langchain
 langchain-core
-
-langchain-google-genai
+langchain-text-splitters
+# langchain-google-genai
 # langchain-openai
 # langchain-anthropic
-# langchain-ollama
+langchain-ollama
+
+# Document Processing
+python-docx
+pymupdf
+aiofiles
+
+# Memory
+mem0ai

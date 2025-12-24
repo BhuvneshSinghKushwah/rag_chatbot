@@ -1,0 +1,130 @@
+FREQUENTLY ASKED QUESTIONS (FAQ)
+
+================================
+ACCOUNT AND ORDERS
+================================
+
+Q: How do I create an account?
+A: Click "Sign Up" on our website or app. Enter your email address, create a password, and provide your name. You'll receive a verification email to confirm your account.
+
+Q: I forgot my password. How do I reset it?
+A: Click "Forgot Password" on the login page. Enter your email address and we'll send you a reset link. The link expires after 24 hours.
+
+Q: How can I track my order?
+A: Log into your account and go to "Order History". Click on the order to see tracking details. You can also use the tracking number in the shipping confirmation email.
+
+Q: Can I modify or cancel my order?
+A: Orders can be modified or cancelled within 1 hour of placement. After that, please wait for delivery and initiate a return if needed. Contact customer service immediately for urgent changes.
+
+Q: Do you offer gift wrapping?
+A: Yes! Select "Gift Wrap" during checkout for $4.99 per item. Includes premium wrapping paper and a personalized message card.
+
+================================
+PAYMENT AND PRICING
+================================
+
+Q: What payment methods do you accept?
+A: We accept Visa, Mastercard, American Express, Discover, PayPal, Apple Pay, Google Pay, and TechGadgets Gift Cards. We also offer financing through Affirm for purchases over $100.
+
+Q: Is my payment information secure?
+A: Yes. We use 256-bit SSL encryption and are PCI DSS compliant. We never store your full credit card number on our servers.
+
+Q: Do you price match?
+A: Yes! We match prices from major retailers including Amazon, Best Buy, and Walmart. The item must be identical, in stock, and sold by the retailer (not third-party sellers). Contact us with a link to the lower price.
+
+Q: When will my card be charged?
+A: Your card is authorized at checkout but only charged when your order ships. Pre-orders are charged when the item becomes available.
+
+Q: Do you offer student or military discounts?
+A: Yes! Students get 10% off with a valid .edu email. Military personnel and veterans receive 15% off with ID.me verification.
+
+================================
+PRODUCTS AND WARRANTY
+================================
+
+Q: Are your products authentic?
+A: Absolutely. We only sell 100% authentic products sourced directly from manufacturers or authorized distributors. Beware of counterfeits from unauthorized sellers.
+
+Q: What warranty do you offer?
+A: All products come with the manufacturer's warranty. Additionally, TechGuard extended warranty is available for purchase:
+- 1 year: $29.99
+- 2 years: $49.99
+- 3 years: $69.99
+TechGuard covers accidental damage, drops, and spills.
+
+Q: How do I file a warranty claim?
+A: Visit techgadgets.com/warranty or call 1-800-TECH-GAD. Have your order number and product serial number ready. Most claims are processed within 48 hours.
+
+Q: Do you sell refurbished products?
+A: Yes, we offer certified refurbished products at 20-40% off retail price. All refurbished items are tested, cleaned, and come with a 90-day warranty.
+
+================================
+TECHNICAL SUPPORT
+================================
+
+Q: How do I contact technical support?
+A: Technical support is available via:
+- Phone: 1-800-TECH-GAD (Option 3) - 7 AM to 10 PM PST
+- Email: techsupport@techgadgets.com
+- Live Chat: 24/7 on our website
+- In-store: Visit any TechGadgets location
+
+Q: Do you offer setup services?
+A: Yes! In-store setup is available for $29.99. This includes:
+- Device configuration
+- Data transfer from old device
+- App installation
+- Tutorial on basic features
+
+Q: Can I schedule a tech consultation?
+A: Book a free 15-minute consultation online or in-store. Our tech experts can help you choose the right product for your needs.
+
+================================
+LOYALTY PROGRAM
+================================
+
+Q: What is TechRewards?
+A: TechRewards is our free loyalty program. Earn 1 point for every $1 spent. Points can be redeemed for discounts on future purchases.
+
+Q: How do I join TechRewards?
+A: Sign up during checkout or create an account online. Membership is automatic and free.
+
+Q: How do I redeem my points?
+A: Points appear as an option during checkout. 100 points = $5 discount. Points expire after 12 months of account inactivity.
+
+Q: Are there member tiers?
+A: Yes!
+- Bronze (0-499 points): Standard benefits
+- Silver (500-1999 points): Free express shipping, early access to sales
+- Gold (2000+ points): 2x points earning, exclusive events, free next-day shipping
+
+================================
+STORE INFORMATION
+================================
+
+Q: What are your store hours?
+A: Most locations are open Monday-Saturday 10 AM - 9 PM, Sunday 11 AM - 6 PM. Hours may vary by location and during holidays. Check techgadgets.com/stores for specific hours.
+
+Q: Can I buy online and pick up in store?
+A: Yes! Select "Store Pickup" during checkout. Orders are usually ready within 2 hours. You'll receive an email when your order is ready.
+
+Q: Do you offer curbside pickup?
+A: Yes! Select "Curbside Pickup" and we'll bring your order to your car. Just check in via the app when you arrive.
+
+Q: Can I return online purchases in store?
+A: Absolutely. Bring your item and order confirmation to any store for immediate processing.
+
+================================
+CONTACT US
+================================
+
+Customer Service Hours:
+- Phone: 7 AM - 10 PM PST, 7 days a week
+- Email: support@techgadgets.com (24-hour response)
+- Live Chat: 24/7
+- Social Media: @TechGadgets on Twitter, Facebook, Instagram
+
+Corporate Inquiries:
+- Press: press@techgadgets.com
+- Partnerships: partners@techgadgets.com
+- Careers: careers@techgadgets.com

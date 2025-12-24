@@ -15,17 +15,24 @@ Build a web app that simulates customer support chat where an AI agent answers u
 | OpenAI | `gpt-4o` | Fallback/Alternative |
 | Anthropic | `claude-sonnet-4-20250514` | Fallback/Alternative |
 
-### Embeddings
-| Provider | Model |
-|----------|-------|
-| Google | `text-embedding-004` |
-| OpenAI | `text-embedding-3-small` |
+### Embeddings (Configurable Providers)
+| Provider | Model | Dimensions | Context | Use Case |
+|----------|-------|------------|---------|----------|
+| Ollama | `nomic-embed-text` | 768 | 8192 tokens | Default (local + production) |
+| OpenAI | `text-embedding-3-small` | 1536 | 8191 tokens | Alternative |
+| Gemini | `text-embedding-004` | 768 | 2048 tokens | Alternative |
+
+**Recommended: `nomic-embed-text`** - Outperforms OpenAI text-embedding-ada-002 and text-embedding-3-small on both short and long context tasks. Ideal for semantic chunking with 1000 token chunks.
+
+Uses async HTTP API with provider abstraction (same pattern as LLM router).
+Warmup on startup eliminates first-request latency.
 
 ### Memory & RAG Framework
 - **Mem0** - Memory layer for conversational context
   - GitHub: https://github.com/mem0ai/mem0
   - Hybrid storage: vector + graph + key-value
-  - Multi-level memory: user, session, agent
+  - **User-level memory only** (no session-level memory)
+  - Memories persist across sessions for continuity
 
 ### Storage (Dockerized)
 | Service | Purpose | Port |
@@ -71,10 +78,12 @@ Build a web app that simulates customer support chat where an AI agent answers u
 │                              │                                   │
 │  ┌───────────────────────────▼───────────────────────────────┐  │
 │  │                    Mem0 Memory Layer                       │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐    │  │
-│  │  │ User Memory │  │Session Mem  │  │ Agent Memory    │    │  │
-│  │  │ (prefs)     │  │(context)    │  │ (knowledge)     │    │  │
-│  │  └─────────────┘  └─────────────┘  └─────────────────┘    │  │
+│  │  ┌─────────────────────────────────────────────────────┐  │  │
+│  │  │              User Memory (user_id based)             │  │  │
+│  │  │  - Preferences, past issues, product interests      │  │  │
+│  │  │  - Historical summaries (compressed old memories)   │  │  │
+│  │  │  - Bounded: max 100 memories per user               │  │  │
+│  │  └─────────────────────────────────────────────────────┘  │  │
 │  └───────────────────────────────────────────────────────────┘  │
 │                              │                                   │
 │  ┌───────────────────────────▼───────────────────────────────┐  │
@@ -140,64 +149,246 @@ Build a web app that simulates customer support chat where an AI agent answers u
 
 ## Mem0 Configuration
 
+**Important:** Embedding provider and LLM provider are configured independently. Once you choose an embedding provider, stick with it - changing requires deleting the Qdrant collection since vector dimensions differ.
+
+| Embedding Provider | Dimensions | Notes |
+|-------------------|------------|-------|
+| `ollama` (nomic-embed-text) | 768 | Default, local, free |
+| `gemini` (text-embedding-004) | 768 | Cloud, requires API key |
+| `openai` (text-embedding-3-small) | 1536 | Cloud, requires API key |
+
 ```python
 from mem0 import Memory
 
-config = {
-    "llm": {
-        "provider": "gemini",
-        "config": {
-            "model": "gemini-2.0-flash-001",
-            "temperature": 0.2,
-            "max_tokens": 2000,
-        }
-    },
-    "embedder": {
-        "provider": "gemini",
-        "config": {
-            "model": "models/text-embedding-004"
-        }
-    },
-    "vector_store": {
-        "provider": "qdrant",
-        "config": {
-            "host": "localhost",
-            "port": 6333,
-            "collection_name": "customer_support_memories"
-        }
-    },
-    "graph_store": {
-        "provider": "neo4j",  # Optional: for relationship tracking
-        "config": {
-            "url": "neo4j://localhost:7687",
-            "username": "neo4j",
-            "password": "password"
+def build_mem0_config(settings) -> dict:
+    config = {
+        "vector_store": {
+            "provider": "qdrant",
+            "config": {
+                "host": settings.QDRANT_HOST,
+                "port": settings.QDRANT_HTTP_PORT,
+                "collection_name": "customer_support_memories",
+            }
         }
     }
-}
 
-memory = Memory.from_config(config)
+    embed_provider = settings.DEFAULT_EMBEDDING_PROVIDER
+    if embed_provider == "ollama":
+        config["vector_store"]["config"]["embedding_model_dims"] = 768
+        config["embedder"] = {
+            "provider": "ollama",
+            "config": {
+                "model": settings.OLLAMA_EMBEDDING_MODEL,
+                "ollama_base_url": settings.OLLAMA_BASE_URL,
+            }
+        }
+    elif embed_provider == "gemini":
+        config["vector_store"]["config"]["embedding_model_dims"] = 768
+        config["embedder"] = {
+            "provider": "gemini",
+            "config": {
+                "model": f"models/{settings.GEMINI_EMBEDDING_MODEL}",
+                "api_key": settings.GEMINI_API_KEY,
+            }
+        }
+    elif embed_provider == "openai":
+        config["vector_store"]["config"]["embedding_model_dims"] = 1536
+        config["embedder"] = {
+            "provider": "openai",
+            "config": {
+                "model": settings.OPENAI_EMBEDDING_MODEL,
+                "api_key": settings.OPENAI_API_KEY,
+            }
+        }
+
+    llm_provider = settings.DEFAULT_LLM_PROVIDER
+    if llm_provider == "ollama":
+        config["llm"] = {
+            "provider": "ollama",
+            "config": {
+                "model": settings.OLLAMA_MODEL_NAME,
+                "temperature": settings.LLM_TEMPERATURE,
+                "max_tokens": settings.LLM_MAX_TOKENS,
+                "ollama_base_url": settings.OLLAMA_BASE_URL,
+            }
+        }
+    elif llm_provider == "gemini":
+        config["llm"] = {
+            "provider": "gemini",
+            "config": {
+                "model": settings.GEMINI_MODEL_NAME,
+                "temperature": settings.LLM_TEMPERATURE,
+                "max_tokens": settings.LLM_MAX_TOKENS,
+                "api_key": settings.GEMINI_API_KEY,
+            }
+        }
+    elif llm_provider == "openai":
+        config["llm"] = {
+            "provider": "openai",
+            "config": {
+                "model": settings.OPENAI_MODEL_NAME,
+                "temperature": settings.LLM_TEMPERATURE,
+                "max_tokens": settings.LLM_MAX_TOKENS,
+                "api_key": settings.OPENAI_API_KEY,
+            }
+        }
+    elif llm_provider == "anthropic":
+        config["llm"] = {
+            "provider": "anthropic",
+            "config": {
+                "model": settings.ANTHROPIC_MODEL_NAME,
+                "temperature": settings.LLM_TEMPERATURE,
+                "max_tokens": settings.LLM_MAX_TOKENS,
+                "api_key": settings.ANTHROPIC_API_KEY,
+            }
+        }
+
+    return config
+
+memory = Memory.from_config(build_mem0_config(settings))
 ```
 
-### Alternative: OpenAI Configuration
+### Memory Management Strategy
+
+User-level memory with bounded storage to prevent unbounded growth.
+
+#### Design Principles
+- **User-level only**: All memories stored by `user_id`, not `session_id`
+- **Cross-session continuity**: User returns next day, bot remembers past interactions
+- **Bounded storage**: Max 100 memories per user to control costs
+
+#### Tiered Retention Policy
+
+| Memory Type | Retention | Examples |
+|-------------|-----------|----------|
+| Preferences | Forever | "Prefers email", "Ships to Canada" |
+| Issues/Complaints | 90 days | "Had refund issue in Oct" |
+| General Q&A | 30 days | "Asked about return policy" |
+| Routine interactions | 7 days | "Asked store hours" |
+
+#### Memory Compaction Process
+
+When user memory count exceeds threshold:
+
+```
+1. Check: user_memory_count > MAX_MEMORIES (100)
+2. Fetch: Get memories older than 30 days
+3. Summarize: LLM compresses old memories into summary
+4. Delete: Remove old individual memories
+5. Store: Save summary as "historical_summary" type
+```
+
+#### Implementation
 
 ```python
-config = {
-    "llm": {
-        "provider": "openai",
-        "config": {
-            "model": "gpt-4o",
-            "temperature": 0.2,
-        }
-    },
-    "embedder": {
-        "provider": "openai",
-        "config": {
-            "model": "text-embedding-3-small"
-        }
-    },
-    # ... rest same
-}
+class MemoryManager:
+    MAX_MEMORIES_PER_USER = 100
+    COMPACTION_THRESHOLD = 80
+    SUMMARY_BATCH_SIZE = 50
+
+    async def compact_user_memory(self, user_id: str):
+        memories = self.memory.get_all(user_id=user_id)
+
+        if len(memories) < self.MAX_MEMORIES_PER_USER:
+            return
+
+        old_memories = [m for m in memories if self._is_old(m, days=30)]
+
+        if len(old_memories) < self.SUMMARY_BATCH_SIZE:
+            return
+
+        summary = await self._summarize_memories(old_memories[:self.SUMMARY_BATCH_SIZE])
+
+        for mem in old_memories[:self.SUMMARY_BATCH_SIZE]:
+            self.memory.delete(mem["id"])
+
+        self.memory.add(
+            content=summary,
+            user_id=user_id,
+            metadata={"type": "historical_summary"}
+        )
+```
+
+#### Session vs Conversation Logging
+
+| Storage | Purpose | Retention |
+|---------|---------|-----------|
+| Mem0 (Qdrant) | User memories for context | Managed by compaction |
+| PostgreSQL | Full conversation logs | Configurable (audit/analytics) |
+| Redis | Active session cache | TTL-based expiry |
+
+### Embedding Service (Configurable Providers)
+
+```python
+from abc import ABC, abstractmethod
+from typing import Optional
+import httpx
+
+class BaseEmbedder(ABC):
+    @abstractmethod
+    async def embed(self, text: str) -> list[float]: ...
+
+    @abstractmethod
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]: ...
+
+    @abstractmethod
+    async def warmup(self) -> None: ...
+
+class OllamaEmbedder(BaseEmbedder):
+    def __init__(self, base_url: str, model: str):
+        self.base_url = base_url
+        self.model = model
+        self.client = httpx.AsyncClient(timeout=30.0)
+
+    async def embed(self, text: str) -> list[float]:
+        response = await self.client.post(
+            f"{self.base_url}/api/embeddings",
+            json={"model": self.model, "prompt": text}
+        )
+        return response.json()["embedding"]
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        return [await self.embed(text) for text in texts]
+
+    async def warmup(self) -> None:
+        await self.embed("warmup")
+
+class OpenAIEmbedder(BaseEmbedder):
+    def __init__(self, api_key: str, model: str = "text-embedding-3-small"):
+        self.api_key = api_key
+        self.model = model
+        self.client = httpx.AsyncClient(
+            base_url="https://api.openai.com/v1",
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=30.0
+        )
+
+    async def embed(self, text: str) -> list[float]:
+        response = await self.client.post(
+            "/embeddings",
+            json={"model": self.model, "input": text}
+        )
+        return response.json()["data"][0]["embedding"]
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        response = await self.client.post(
+            "/embeddings",
+            json={"model": self.model, "input": texts}
+        )
+        data = response.json()["data"]
+        return [item["embedding"] for item in sorted(data, key=lambda x: x["index"])]
+
+    async def warmup(self) -> None:
+        pass  # No warmup needed for cloud API
+
+def get_embedder(provider: str, settings) -> BaseEmbedder:
+    if provider == "ollama":
+        return OllamaEmbedder(settings.OLLAMA_BASE_URL, settings.OLLAMA_EMBEDDING_MODEL)
+    elif provider == "openai":
+        return OpenAIEmbedder(settings.OPENAI_API_KEY, settings.OPENAI_EMBEDDING_MODEL)
+    elif provider == "gemini":
+        return GeminiEmbedder(settings.GEMINI_API_KEY, settings.GEMINI_EMBEDDING_MODEL)
+    raise ValueError(f"Unknown embedding provider: {provider}")
 ```
 
 ---
@@ -253,15 +444,24 @@ volumes:
 
 ### Chat API
 ```
-POST /api/chat
-  Body: { message, session_id, user_id? }
-  Response: { response, sources[], memory_updated }
+WebSocket /api/chat/ws
+  Connect: /api/chat/ws?session_id={session_id}&fingerprint={fingerprint}
 
-POST /api/chat/stream
-  Body: { message, session_id, user_id? }
-  Response: SSE stream
+  Client -> Server:
+    { type: "message", content: string }
+
+  Server -> Client:
+    { type: "token", content: string }      # Streaming tokens
+    { type: "complete", sources: string[] } # End of response
+    { type: "error", message: string }      # Error
+
+POST /api/chat
+  Body: { message, session_id, fingerprint }
+  Response: { response, sources[], user_id, memory_updated }
+  Note: Non-streaming fallback, fingerprint required for user_id generation
 
 GET /api/chat/history/{session_id}
+  Query: ?fingerprint={fingerprint}
   Response: { messages[] }
 ```
 
@@ -399,6 +599,13 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 # Default LLM (gemini, openai, anthropic)
 DEFAULT_LLM_PROVIDER=gemini
 
+# Embeddings (configurable provider)
+# nomic-embed-text recommended for both local and production
+DEFAULT_EMBEDDING_PROVIDER=ollama
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+GEMINI_EMBEDDING_MODEL=text-embedding-004
+
 # Database
 POSTGRES_PASSWORD=secure_password
 DATABASE_URL=postgresql://support_user:${POSTGRES_PASSWORD}@localhost:5432/support_chat
@@ -420,31 +627,34 @@ CORS_ORIGINS=http://localhost:3000
 ## Implementation Phases
 
 ### Phase 1: Infrastructure Setup
-- [ ] Create docker-compose.yml with Redis, Qdrant, PostgreSQL
-- [ ] Set up FastAPI project structure
-- [ ] Configure environment variables
-- [ ] Basic health check endpoints
+- [D] Create docker-compose.yml with Redis, Qdrant, PostgreSQL
+- [D] Set up FastAPI project structure
+- [D] Configure environment variables
+- [D] Basic health check endpoints
 
 ### Phase 2: Document Ingestion Pipeline
-- [ ] Document upload endpoint
-- [ ] Text extraction (PDF, DOCX, MD, TXT)
-- [ ] Chunking strategy (semantic or fixed-size)
-- [ ] Embedding generation (Google/OpenAI)
-- [ ] Store in Qdrant
+- [D] Document upload endpoint
+- [D] Text extraction (PDF, DOCX, MD, TXT)
+- [D] Chunking strategy (semantic via LangChain RecursiveCharacterTextSplitter)
+- [D] Embedding generation (Ollama/OpenAI/Gemini - configurable)
+- [D] Store in Qdrant
 
 ### Phase 3: Memory Integration
-- [ ] Initialize Mem0 with Qdrant backend
-- [ ] Configure LLM provider (Gemini default)
-- [ ] Implement memory add/search/update
-- [ ] Session and user-level memory separation
+- [D] Initialize Mem0 with Qdrant backend
+- [D] Configure LLM provider (Gemini default)
+- [D] Implement memory add/search/update
+- [D] User-level memory only (no session-level memory)
+- [D] Memory compaction service (summarize old memories)
+- [D] Tiered retention policy implementation
 
 ### Phase 4: Chat API
-- [ ] POST /chat endpoint
-- [ ] RAG retrieval from Qdrant
-- [ ] Memory context injection
-- [ ] LLM response generation
-- [ ] Streaming support (SSE)
-- [ ] Conversation logging to PostgreSQL
+- [D] Fingerprint-based user_id generation (required)
+- [D] WebSocket /chat/ws endpoint with streaming
+- [D] POST /chat endpoint (non-streaming fallback)
+- [D] RAG retrieval from Qdrant
+- [D] Memory context injection
+- [D] LLM response generation
+- [D] Conversation logging to PostgreSQL
 
 ### Phase 5: Frontend
 - [ ] React/Next.js chat widget
@@ -691,13 +901,16 @@ class DocumentChunkResponse(BaseModel):
 │     - TXT/MD: direct read                                       │
 │                              │                                   │
 │  2. Chunk text               │                                   │
-│     - Strategy: semantic (LangChain) or fixed-size              │
-│     - Chunk size: 500-1000 tokens                               │
-│     - Overlap: 50-100 tokens                                    │
+│     - Strategy: semantic (LangChain RecursiveCharacterTextSplitter)
+│     - Chunk size: 1000 tokens (~4000 chars)                     │
+│     - Overlap: 200 tokens (~800 chars)                          │
+│     - Separators: ["\n\n", "\n", ". ", " ", ""]                 │
 │                              │                                   │
 │  3. Generate embeddings      │                                   │
-│     - Batch process chunks                                      │
-│     - Use configured embedder (Google/OpenAI)                   │
+│     - Batch process chunks via async HTTP API                   │
+│     - Default: Ollama nomic-embed-text (768 dims, 8k context)   │
+│     - Alternatives: OpenAI / Gemini (configurable)              │
+│     - Warmup on startup for Ollama to eliminate cold start      │
 │                              │                                   │
 │  4. Store in Qdrant          │                                   │
 │     - Collection: "documents" (or per-user future)              │
