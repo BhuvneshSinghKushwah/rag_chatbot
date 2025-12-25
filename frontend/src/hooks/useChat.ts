@@ -76,14 +76,12 @@ export function useChat() {
           content: msg.content,
           createdAt: new Date(msg.created_at),
         }));
-        setMessages(loadedMessages);
-        setCachedMessages(sid, loadedMessages);
+        if (loadedMessages.length > 0) {
+          setMessages(loadedMessages);
+          setCachedMessages(sid, loadedMessages);
+        }
       }
     } catch {
-      if (switchIdRef.current === switchId) {
-        const cached = getCachedMessages(sid);
-        setMessages(cached);
-      }
     } finally {
       if (switchIdRef.current === switchId) {
         setIsLoadingHistory(false);
@@ -233,7 +231,8 @@ export function useChat() {
     return () => {
       cleanupWebSocket();
     };
-  }, [sessionId, fingerprint, isInitialized, fetchHistory, connectWebSocket, cleanupWebSocket]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, fingerprint, isInitialized]);
 
 
   const sendMessage = useCallback(
@@ -262,7 +261,13 @@ export function useChat() {
         isStreaming: true,
       };
 
-      setMessages((prev) => [...prev, userMessage, assistantMessage]);
+      setMessages((prev) => {
+        const updated = [...prev, userMessage, assistantMessage];
+        if (currentSessionRef.current) {
+          setCachedMessages(currentSessionRef.current, updated);
+        }
+        return updated;
+      });
 
       wsRef.current.send(JSON.stringify({ type: 'message', content }));
     },

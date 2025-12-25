@@ -159,11 +159,52 @@ class LLMService:
         messages: list[BaseMessage],
         provider: Optional[str] = None,
     ) -> AsyncIterator[str]:
-        llm = self.get_provider(provider)
+        provider_name = provider or self.default_provider
 
-        async for chunk in llm.astream(messages):
-            if chunk.content:
-                yield chunk.content
+        if provider_name == "ollama":
+            async for chunk in self._stream_ollama(messages):
+                yield chunk
+        else:
+            llm = self.get_provider(provider)
+            async for chunk in llm.astream(messages):
+                if chunk.content:
+                    yield chunk.content
+
+    async def _stream_ollama(self, messages: list[BaseMessage]) -> AsyncIterator[str]:
+        import httpx
+
+        ollama_messages = []
+        for msg in messages:
+            if isinstance(msg, SystemMessage):
+                ollama_messages.append({"role": "system", "content": msg.content})
+            elif isinstance(msg, HumanMessage):
+                ollama_messages.append({"role": "user", "content": msg.content})
+            elif isinstance(msg, AIMessage):
+                ollama_messages.append({"role": "assistant", "content": msg.content})
+
+        payload = {
+            "model": self.settings.OLLAMA_MODEL_NAME,
+            "messages": ollama_messages,
+            "stream": True,
+            "options": {
+                "temperature": self.settings.LLM_TEMPERATURE,
+            },
+        }
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            async with client.stream(
+                "POST",
+                f"{self.settings.OLLAMA_BASE_URL}/api/chat",
+                json=payload,
+            ) as response:
+                async for line in response.aiter_lines():
+                    if line:
+                        import json
+                        data = json.loads(line)
+                        if "message" in data and "content" in data["message"]:
+                            content = data["message"]["content"]
+                            if content:
+                                yield content
 
     def create_messages(
         self,
