@@ -11,7 +11,7 @@
 1. Go to AWS Console > EC2 > Launch Instance
 2. Configure:
    - **Name**: rag-chatbot
-   - **AMI**: Amazon Linux 2023
+   - **AMI**: Ubuntu Server 24.04 LTS
    - **Instance type**: t3.medium (minimum) or t3.large (recommended)
    - **Key pair**: Create new or use existing
    - **Security Group**: Create with these rules:
@@ -50,7 +50,7 @@ Wait 5-10 minutes for DNS propagation.
 SSH into your instance:
 
 ```bash
-ssh -i your-key.pem ec2-user@YOUR_EC2_IP
+ssh -i your-key.pem ubuntu@YOUR_EC2_IP
 ```
 
 Run setup script:
@@ -63,33 +63,33 @@ Or manually:
 
 ```bash
 # Update system
-sudo dnf update -y
+sudo apt-get update -y
+sudo apt-get upgrade -y
 
 # Install Docker
-sudo dnf install -y docker
+sudo apt-get install -y ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update -y
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 sudo systemctl start docker
 sudo systemctl enable docker
-sudo usermod -aG docker ec2-user
-
-# Install Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
+sudo usermod -aG docker ubuntu
 
 # Install Git
-sudo dnf install -y git
+sudo apt-get install -y git
 
 # Install Certbot
-sudo dnf install -y python3 augeas-libs
-sudo python3 -m venv /opt/certbot/
-sudo /opt/certbot/bin/pip install certbot
-sudo ln -sf /opt/certbot/bin/certbot /usr/bin/certbot
+sudo apt-get install -y certbot
 ```
 
 Log out and back in for docker group to take effect:
 
 ```bash
 exit
-ssh -i your-key.pem ec2-user@YOUR_EC2_IP
+ssh -i your-key.pem ubuntu@YOUR_EC2_IP
 ```
 
 ## Step 4: Clone and Configure
@@ -154,14 +154,14 @@ docker-compose -f /opt/rag-chatbot/deploy/docker-compose.prod.yml logs -f
 
 ```bash
 cd /opt/rag-chatbot/deploy
-docker-compose -f docker-compose.prod.yml logs -f
-docker-compose -f docker-compose.prod.yml logs backend  # specific service
+docker compose -f docker-compose.prod.yml logs -f
+docker compose -f docker-compose.prod.yml logs backend  # specific service
 ```
 
 ### Restart Services
 
 ```bash
-docker-compose -f docker-compose.prod.yml restart
+docker compose -f docker-compose.prod.yml restart
 ```
 
 ### Update Application
@@ -170,7 +170,7 @@ docker-compose -f docker-compose.prod.yml restart
 cd /opt/rag-chatbot
 git pull
 cd deploy
-docker-compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 ### Renew SSL Certificate
@@ -179,7 +179,7 @@ Certbot auto-renews, but manual renewal:
 
 ```bash
 sudo certbot renew
-docker-compose -f docker-compose.prod.yml restart nginx
+docker compose -f docker-compose.prod.yml restart nginx
 ```
 
 ### Backup Database
