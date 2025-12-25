@@ -9,7 +9,7 @@ CLAUDE.*
 
 **/data/
 
-plan.md
-plan.frontend.md
+plan.*
+setup-server.sh
 
 deploy

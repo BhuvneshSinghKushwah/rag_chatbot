@@ -106,6 +106,15 @@ async def health_check():
     return {"status": "healthy"}
 
 
+@app.get("/api/config")
+async def get_config(request: Request):
+    host = request.headers.get("host", "localhost:8000")
+    scheme = request.headers.get("x-forwarded-proto", "http")
+    return {
+        "wsUrl": f"{scheme}://{host}",
+    }
+
+
 @app.get("/")
 async def root():
     return {
