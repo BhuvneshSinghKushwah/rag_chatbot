@@ -63,10 +63,10 @@ Or manually:
 
 ```bash
 # Update system
-sudo yum update -y
+sudo dnf update -y
 
 # Install Docker
-sudo yum install -y docker
+sudo dnf install -y docker
 sudo systemctl start docker
 sudo systemctl enable docker
 sudo usermod -aG docker ec2-user
@@ -76,10 +76,10 @@ sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-
 sudo chmod +x /usr/local/bin/docker-compose
 
 # Install Git
-sudo yum install -y git
+sudo dnf install -y git
 
 # Install Certbot
-sudo yum install -y python3 augeas-libs
+sudo dnf install -y python3 augeas-libs
 sudo python3 -m venv /opt/certbot/
 sudo /opt/certbot/bin/pip install certbot
 sudo ln -sf /opt/certbot/bin/certbot /usr/bin/certbot

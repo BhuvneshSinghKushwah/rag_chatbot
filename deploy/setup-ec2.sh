@@ -3,10 +3,10 @@ set -e
 
 echo "=== RAG Chatbot EC2 Setup Script ==="
 
-sudo yum update -y
+sudo dnf update -y
 
 echo "Installing Docker..."
-sudo yum install -y docker
+sudo dnf install -y docker
 sudo systemctl start docker
 sudo systemctl enable docker
 sudo usermod -aG docker ec2-user
@@ -16,10 +16,10 @@ sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-
 sudo chmod +x /usr/local/bin/docker-compose
 
 echo "Installing Git..."
-sudo yum install -y git
+sudo dnf install -y git
 
 echo "Installing Certbot..."
-sudo yum install -y python3 augeas-libs
+sudo dnf install -y python3 augeas-libs
 sudo python3 -m venv /opt/certbot/
 sudo /opt/certbot/bin/pip install --upgrade pip
 sudo /opt/certbot/bin/pip install certbot
