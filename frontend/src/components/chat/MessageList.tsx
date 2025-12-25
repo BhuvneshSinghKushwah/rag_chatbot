@@ -21,10 +21,10 @@ export function MessageList({ messages, isLoading = false }: MessageListProps) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="text-center">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <h3 className="text-lg font-medium text-white mb-2">
             Welcome to Customer Support
           </h3>
-          <p className="text-gray-500 max-w-md">
+          <p className="text-gray-400 max-w-md">
             Ask me anything about our products, services, or policies.
             I have access to our knowledge base and can help answer your questions.
           </p>

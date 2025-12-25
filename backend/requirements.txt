@@ -20,9 +20,9 @@ httpx
 langchain
 langchain-core
 langchain-text-splitters
-# langchain-google-genai
-# langchain-openai
-# langchain-anthropic
+langchain-google-genai
+langchain-openai
+langchain-anthropic
 langchain-ollama
 
 # Document Processing

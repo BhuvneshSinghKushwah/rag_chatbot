@@ -35,7 +35,7 @@ export function MessageInput({ onSend, disabled = false, placeholder = 'Type you
   };
 
   return (
-    <form onSubmit={handleSubmit} className="border-t bg-white p-4">
+    <form onSubmit={handleSubmit} className="border-t border-neutral-800 bg-black p-4">
       <div className="flex items-end gap-3 max-w-4xl mx-auto">
         <textarea
           ref={textareaRef}
@@ -45,12 +45,12 @@ export function MessageInput({ onSend, disabled = false, placeholder = 'Type you
           placeholder={placeholder}
           disabled={disabled}
           rows={1}
-          className="flex-1 resize-none rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className="flex-1 resize-none rounded-xl border border-neutral-700 bg-neutral-900 text-white placeholder-gray-500 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-neutral-800 disabled:cursor-not-allowed"
         />
         <button
           type="submit"
           disabled={disabled || !message.trim()}
-          className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-neutral-700 disabled:cursor-not-allowed transition-colors"
         >
           Send
         </button>

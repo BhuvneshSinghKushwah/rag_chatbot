@@ -8,9 +8,34 @@ import { useSession } from './useSession';
 
 export const CONVERSATIONS_UPDATED_EVENT = 'conversations-updated';
 
+const MESSAGES_CACHE_KEY = 'chat_messages_cache';
+
+function getCachedMessages(sessionId: string): ChatMessage[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const cached = localStorage.getItem(`${MESSAGES_CACHE_KEY}_${sessionId}`);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      return parsed.map((msg: ChatMessage) => ({
+        ...msg,
+        createdAt: new Date(msg.createdAt),
+      }));
+    }
+  } catch {}
+  return [];
+}
+
+function setCachedMessages(sessionId: string, messages: ChatMessage[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const toCache = messages.filter(m => !m.isStreaming);
+    localStorage.setItem(`${MESSAGES_CACHE_KEY}_${sessionId}`, JSON.stringify(toCache));
+  } catch {}
+}
+
 export function useChat() {
   const { fingerprint } = useFingerprint();
-  const { sessionId } = useSession();
+  const { sessionId, isInitialized } = useSession();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,68 +47,109 @@ export function useChat() {
   const reconnectAttemptsRef = useRef(0);
   const isConnectingRef = useRef(false);
   const currentSessionRef = useRef<string | null>(null);
+  const switchIdRef = useRef(0);
   const maxReconnectAttempts = 5;
 
-  const fetchHistory = useCallback(async (sid: string, fp: string) => {
+  const cleanupWebSocket = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.onopen = null;
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      wsRef.current.onmessage = null;
+      if (wsRef.current.readyState === WebSocket.OPEN ||
+          wsRef.current.readyState === WebSocket.CONNECTING) {
+        wsRef.current.close();
+      }
+      wsRef.current = null;
+    }
+    isConnectingRef.current = false;
+  }, []);
+
+  const fetchHistory = useCallback(async (sid: string, fp: string, switchId: number) => {
     setIsLoadingHistory(true);
     try {
       const response = await chatApi.getHistory(sid, fp);
-      if (currentSessionRef.current === sid) {
-        setMessages(
-          response.messages.map((msg: ChatHistoryMessage) => ({
-            id: msg.id,
-            role: msg.role as 'user' | 'assistant',
-            content: msg.content,
-            createdAt: new Date(msg.created_at),
-          }))
-        );
+      if (switchIdRef.current === switchId) {
+        const loadedMessages = response.messages.map((msg: ChatHistoryMessage) => ({
+          id: msg.id,
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+          createdAt: new Date(msg.created_at),
+        }));
+        setMessages(loadedMessages);
+        setCachedMessages(sid, loadedMessages);
       }
     } catch {
-      if (currentSessionRef.current === sid) {
-        setMessages([]);
+      if (switchIdRef.current === switchId) {
+        const cached = getCachedMessages(sid);
+        setMessages(cached);
       }
     } finally {
-      setIsLoadingHistory(false);
+      if (switchIdRef.current === switchId) {
+        setIsLoadingHistory(false);
+      }
     }
   }, []);
 
-  const connectWebSocket = useCallback(async () => {
-    if (!sessionId || !fingerprint) return;
-
+  const connectWebSocket = useCallback(async (sid: string, fp: string) => {
     if (isConnectingRef.current ||
         wsRef.current?.readyState === WebSocket.OPEN ||
         wsRef.current?.readyState === WebSocket.CONNECTING) {
       return;
     }
 
+    if (currentSessionRef.current !== sid) {
+      return;
+    }
+
     isConnectingRef.current = true;
 
     try {
-      const ws = await chatApi.createWebSocket(sessionId, fingerprint);
+      const ws = await chatApi.createWebSocket(sid, fp);
+
+      if (currentSessionRef.current !== sid) {
+        ws.close();
+        isConnectingRef.current = false;
+        return;
+      }
 
       ws.onopen = () => {
-        setIsConnected(true);
-        setError(null);
-        reconnectAttemptsRef.current = 0;
+        if (currentSessionRef.current === sid) {
+          setIsConnected(true);
+          setError(null);
+          reconnectAttemptsRef.current = 0;
+        } else {
+          ws.close();
+        }
       };
 
       ws.onclose = () => {
-        setIsConnected(false);
-        wsRef.current = null;
-        isConnectingRef.current = false;
+        if (currentSessionRef.current === sid) {
+          setIsConnected(false);
+          wsRef.current = null;
+          isConnectingRef.current = false;
 
-        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
-          reconnectAttemptsRef.current++;
-          setTimeout(connectWebSocket, delay);
+          if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
+            reconnectAttemptsRef.current++;
+            setTimeout(() => {
+              if (currentSessionRef.current === sid) {
+                connectWebSocket(sid, fp);
+              }
+            }, delay);
+          }
         }
       };
 
       ws.onerror = () => {
-        setError('Connection error. Retrying...');
+        if (currentSessionRef.current === sid) {
+          setError('Connection error. Retrying...');
+        }
       };
 
       ws.onmessage = (event) => {
+        if (currentSessionRef.current !== sid) return;
+
         try {
           const data: WebSocketMessage = JSON.parse(event.data);
 
@@ -103,13 +169,17 @@ export function useChat() {
             setMessages((prev) => {
               const lastMessage = prev[prev.length - 1];
               if (lastMessage?.isStreaming) {
-                return [
+                const updated = [
                   ...prev.slice(0, -1),
                   {
                     ...lastMessage,
                     isStreaming: false,
                   },
                 ];
+                if (currentSessionRef.current) {
+                  setCachedMessages(currentSessionRef.current, updated);
+                }
+                return updated;
               }
               return prev;
             });
@@ -136,34 +206,34 @@ export function useChat() {
       isConnectingRef.current = false;
     } catch {
       isConnectingRef.current = false;
-      setError('Failed to connect to chat server');
+      if (currentSessionRef.current === sid) {
+        setError('Failed to connect to chat server');
+      }
     }
-  }, [sessionId, fingerprint]);
+  }, []);
 
   useEffect(() => {
-    if (sessionId && fingerprint) {
-      currentSessionRef.current = sessionId;
-      setMessages([]);
+    if (!isInitialized || !sessionId || !fingerprint) return;
 
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-      reconnectAttemptsRef.current = 0;
-      isConnectingRef.current = false;
+    const currentSwitchId = ++switchIdRef.current;
+    currentSessionRef.current = sessionId;
 
-      fetchHistory(sessionId, fingerprint);
-      connectWebSocket();
-    }
+    const cached = getCachedMessages(sessionId);
+    setMessages(cached);
+    setError(null);
+    setIsLoading(false);
+    streamingMessageRef.current = '';
+
+    cleanupWebSocket();
+    reconnectAttemptsRef.current = 0;
+
+    fetchHistory(sessionId, fingerprint, currentSwitchId);
+    connectWebSocket(sessionId, fingerprint);
 
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-      isConnectingRef.current = false;
+      cleanupWebSocket();
     };
-  }, [sessionId, fingerprint, fetchHistory, connectWebSocket]);
+  }, [sessionId, fingerprint, isInitialized, fetchHistory, connectWebSocket, cleanupWebSocket]);
 
 
   const sendMessage = useCallback(

@@ -8,11 +8,11 @@ export function ChatWidget() {
   const { messages, isConnected, isLoading, error, sendMessage } = useChat();
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-black">
       <MessageList messages={messages} isLoading={isLoading} />
       {error && (
-        <div className="px-4 py-2 bg-red-50 border-t border-red-100">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="px-4 py-2 bg-red-900/30 border-t border-red-800">
+          <p className="text-sm text-red-400">{error}</p>
         </div>
       )}
       <MessageInput

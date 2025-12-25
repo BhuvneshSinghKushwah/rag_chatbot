@@ -3,27 +3,56 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 249, 250, 251;
-  --background-end-rgb: 255, 255, 255;
+  --surface-50: #0a0a0a;
+  --surface-100: #111111;
+  --surface-200: #1a1a1a;
+  --surface-300: #262626;
+  --surface-400: #404040;
+  --surface-500: #525252;
+  --surface-600: #737373;
+  --surface-700: #a3a3a3;
+  --surface-800: #d4d4d4;
+  --surface-900: #fafafa;
+
+  --primary-50: #1e3a5f;
+  --primary-100: #1e40af;
+  --primary-200: #1d4ed8;
+  --primary-300: #2563eb;
+  --primary-400: #3b82f6;
+  --primary-500: #60a5fa;
+  --primary-600: #93c5fd;
+  --primary-700: #bfdbfe;
+  --primary-800: #dbeafe;
+  --primary-900: #eff6ff;
+
+  --shadow-color: rgba(96, 165, 250, 0.2);
+
+  --foreground: #ffffff;
+  --background: #000000;
+  --muted: #9ca3af;
+  --border: #262626;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  color: var(--foreground);
+  background-color: var(--background);
+}
+
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
 }
 
 .prose pre {
-  @apply bg-gray-800 text-gray-100 rounded-lg p-4 overflow-x-auto;
+  @apply bg-surface-100 text-gray-100 rounded-lg p-4 overflow-x-auto;
 }
 
 .prose code {
-  @apply bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-sm;
+  @apply bg-surface-200 text-gray-200 px-1 py-0.5 rounded text-sm;
 }
 
 .prose pre code {

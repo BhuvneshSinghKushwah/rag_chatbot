@@ -177,6 +177,32 @@ async def get_chat_history(
     )
 
 
+@router.post("/conversations")
+async def create_conversation(
+    session_id: str = Query(...),
+    fingerprint: str = Query(...),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+):
+    rate_limiter = await get_rate_limiter()
+    user_id = await rate_limiter.resolve_user_id(fingerprint, request)
+
+    result = await db.execute(
+        select(Conversation).where(Conversation.session_id == session_id)
+    )
+    existing = result.scalar_one_or_none()
+
+    if existing:
+        return {"id": existing.id, "session_id": existing.session_id, "created": False}
+
+    conversation = Conversation(session_id=session_id, user_id=user_id)
+    db.add(conversation)
+    await db.commit()
+    await db.refresh(conversation)
+
+    return {"id": conversation.id, "session_id": conversation.session_id, "created": True}
+
+
 @router.get("/conversations", response_model=ConversationsListResponse)
 async def list_conversations(
     fingerprint: str = Query(...),

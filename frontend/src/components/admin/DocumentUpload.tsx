@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
+import { useAdmin } from '@/hooks';
 import { documentsApi } from '@/services/api';
 import { cn } from '@/lib/utils';
 
-interface UploadFormProps {
+interface DocumentUploadProps {
   onUploadComplete?: () => void;
 }
 
@@ -13,9 +14,8 @@ type UploadState = 'idle' | 'uploading' | 'success' | 'error';
 const ALLOWED_TYPES = ['pdf', 'txt', 'md', 'docx'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-export function UploadForm({ onUploadComplete }: UploadFormProps) {
-  const [adminKey, setAdminKey] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
+  const { adminKey } = useAdmin();
   const [file, setFile] = useState<File | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>('idle');
   const [progress, setProgress] = useState(0);
@@ -84,86 +84,31 @@ export function UploadForm({ onUploadComplete }: UploadFormProps) {
     } catch (err) {
       setUploadState('error');
       if (err instanceof Error) {
-        if (err.message.includes('403') || err.message.includes('Invalid admin key')) {
-          setError('Invalid admin key');
-          setIsAuthenticated(false);
-        } else {
-          setError(err.message);
-        }
+        setError(err.message);
       } else {
         setError('Upload failed');
       }
     }
   };
 
-  const handleAuthenticate = () => {
-    if (adminKey.trim()) {
-      setIsAuthenticated(true);
-      setError(null);
-    }
-  };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="border border-surface-300 rounded-lg p-6 bg-surface-100">
-        <h3 className="text-lg font-medium text-white mb-4">Admin Upload</h3>
-        <p className="text-sm text-gray-400 mb-4">
-          Enter your admin API key to upload documents.
-        </p>
-        <div className="space-y-4">
-          <input
-            type="password"
-            value={adminKey}
-            onChange={(e) => setAdminKey(e.target.value)}
-            placeholder="Admin API Key"
-            className="w-full px-3 py-2 bg-surface-200 border border-surface-300 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
-            onKeyDown={(e) => e.key === 'Enter' && handleAuthenticate()}
-          />
-          {error && <p className="text-sm text-red-400">{error}</p>}
-          <button
-            onClick={handleAuthenticate}
-            disabled={!adminKey.trim()}
-            className="w-full px-4 py-2 text-sm font-medium text-white bg-primary-400 rounded-lg hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Authenticate
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="border border-surface-300 rounded-lg p-6 bg-surface-100">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-medium text-white">Upload Document</h3>
-        <button
-          onClick={() => {
-            setIsAuthenticated(false);
-            setAdminKey('');
-            setFile(null);
-            setError(null);
-            setSuccessMessage(null);
-          }}
-          className="text-sm text-gray-400 hover:text-gray-300"
-        >
-          Logout
-        </button>
-      </div>
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-white">Upload Document</h3>
 
       <div
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         className={cn(
-          'border-2 border-dashed rounded-lg p-8 text-center transition-colors',
-          isDragging ? 'border-primary-400 bg-surface-200' : 'border-surface-300',
+          'border-2 border-dashed rounded-lg p-8 text-center transition-colors bg-neutral-800',
+          isDragging ? 'border-blue-500 bg-blue-900/20' : 'border-neutral-600',
           uploadState === 'uploading' && 'pointer-events-none opacity-50'
         )}
       >
         {file ? (
           <div className="space-y-2">
             <div className="flex items-center justify-center gap-2">
-              <span className="text-2xl">
+              <span className="text-2xl text-gray-400">
                 {file.name.endsWith('.pdf') ? 'PDF' :
                  file.name.endsWith('.docx') ? 'DOCX' :
                  file.name.endsWith('.md') ? 'MD' : 'TXT'}
@@ -183,11 +128,11 @@ export function UploadForm({ onUploadComplete }: UploadFormProps) {
         ) : (
           <div className="space-y-2">
             <div className="text-4xl text-gray-500">+</div>
-            <p className="text-gray-400">
+            <p className="text-gray-300">
               Drag and drop a file here, or{' '}
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="text-primary-400 hover:text-primary-500 font-medium"
+                className="text-blue-400 hover:text-blue-300 font-medium"
               >
                 browse
               </button>
@@ -207,14 +152,14 @@ export function UploadForm({ onUploadComplete }: UploadFormProps) {
       </div>
 
       {uploadState === 'uploading' && (
-        <div className="mt-4">
+        <div>
           <div className="flex items-center justify-between text-sm mb-1">
             <span className="text-gray-400">Uploading...</span>
             <span className="text-white font-medium">{progress}%</span>
           </div>
-          <div className="w-full bg-surface-300 rounded-full h-2">
+          <div className="w-full bg-neutral-700 rounded-full h-2">
             <div
-              className="bg-primary-400 h-2 rounded-full transition-all duration-300"
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -222,13 +167,13 @@ export function UploadForm({ onUploadComplete }: UploadFormProps) {
       )}
 
       {error && (
-        <div className="mt-4 p-3 bg-red-900/20 border border-red-800 rounded-lg">
+        <div className="p-3 bg-red-900/30 border border-red-800 rounded-lg">
           <p className="text-sm text-red-400">{error}</p>
         </div>
       )}
 
       {successMessage && (
-        <div className="mt-4 p-3 bg-green-900/20 border border-green-800 rounded-lg">
+        <div className="p-3 bg-green-900/30 border border-green-800 rounded-lg">
           <p className="text-sm text-green-400">{successMessage}</p>
         </div>
       )}
@@ -236,7 +181,7 @@ export function UploadForm({ onUploadComplete }: UploadFormProps) {
       <button
         onClick={handleUpload}
         disabled={!file || uploadState === 'uploading'}
-        className="mt-4 w-full px-4 py-2 text-sm font-medium text-white bg-primary-400 rounded-lg hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {uploadState === 'uploading' ? 'Uploading...' : 'Upload Document'}
       </button>

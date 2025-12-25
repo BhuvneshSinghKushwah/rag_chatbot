@@ -66,6 +66,14 @@ export const chatApi = {
     const params = new URLSearchParams({ session_id: sessionId, fingerprint });
     return new WebSocket(`${protocol}//${url.host}/api/chat/ws?${params}`);
   },
+
+  async createConversation(sessionId: string, fingerprint: string): Promise<{ id: string; session_id: string; created: boolean }> {
+    const params = new URLSearchParams({ session_id: sessionId, fingerprint });
+    const response = await fetch(`/api/chat/conversations?${params}`, {
+      method: 'POST',
+    });
+    return handleResponse(response);
+  },
 };
 
 export const documentsApi = {
@@ -133,6 +141,114 @@ export const documentsApi = {
     if (!response.ok) {
       throw new ApiError(response.status, 'Failed to delete document');
     }
+  },
+};
+
+export interface AnalyticsResponse {
+  period: {
+    start: string;
+    end: string;
+    days: number;
+  };
+  summary: {
+    total_conversations: number;
+    total_messages: number;
+    unique_users: number;
+    avg_messages_per_conversation: number;
+  };
+  documents: {
+    total: number;
+    ready: number;
+  };
+  daily: Array<{
+    date: string;
+    conversations: number;
+    messages: number;
+    unique_users: number;
+  }>;
+}
+
+export interface TopUsersResponse {
+  period_days: number;
+  users: Array<{
+    user_id: string;
+    conversation_count: number;
+    message_count: number;
+  }>;
+}
+
+export interface AdminConversation {
+  id: string;
+  session_id: string;
+  user_id: string;
+  preview: string;
+  message_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationDetail {
+  id: string;
+  session_id: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+  messages: Array<{
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    sources: unknown[] | null;
+    created_at: string;
+  }>;
+}
+
+export const adminApi = {
+  async verifyKey(key: string): Promise<boolean> {
+    const response = await fetch('/api/admin/verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Key': key,
+      },
+    });
+    return response.ok;
+  },
+
+  async getAnalytics(adminKey: string, days: number = 30): Promise<AnalyticsResponse> {
+    const params = new URLSearchParams({ days: days.toString() });
+    const response = await fetch(`/api/admin/analytics/usage?${params}`, {
+      headers: { 'X-Admin-Key': adminKey },
+    });
+    return handleResponse<AnalyticsResponse>(response);
+  },
+
+  async getTopUsers(adminKey: string, days: number = 30, limit: number = 10): Promise<TopUsersResponse> {
+    const params = new URLSearchParams({ days: days.toString(), limit: limit.toString() });
+    const response = await fetch(`/api/admin/analytics/top-users?${params}`, {
+      headers: { 'X-Admin-Key': adminKey },
+    });
+    return handleResponse<TopUsersResponse>(response);
+  },
+
+  async getConversations(
+    adminKey: string,
+    limit: number = 50,
+    offset: number = 0,
+    userId?: string
+  ): Promise<{ conversations: AdminConversation[]; total: number }> {
+    const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
+    if (userId) params.append('user_id', userId);
+    const response = await fetch(`/api/admin/conversations?${params}`, {
+      headers: { 'X-Admin-Key': adminKey },
+    });
+    return handleResponse<{ conversations: AdminConversation[]; total: number }>(response);
+  },
+
+  async getConversation(adminKey: string, id: string): Promise<ConversationDetail> {
+    const response = await fetch(`/api/admin/conversations/${id}`, {
+      headers: { 'X-Admin-Key': adminKey },
+    });
+    return handleResponse<ConversationDetail>(response);
   },
 };
 

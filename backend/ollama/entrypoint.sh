@@ -1,5 +1,7 @@
 #!/bin/bash
 
+rm -f /tmp/ollama_ready
+
 ollama serve &
 
 echo "Waiting for Ollama to start..."
@@ -16,5 +18,6 @@ echo "Pulling embedding model: nomic-embed-text"
 ollama pull nomic-embed-text
 
 echo "Ollama ready with $MODEL_NAME and nomic-embed-text"
+touch /tmp/ollama_ready
 
 wait

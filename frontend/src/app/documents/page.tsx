@@ -1,7 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { MainLayout } from '@/components/layout';
-import { DocumentList, UploadForm } from '@/components/documents';
+import { DocumentList } from '@/components/documents';
 import { useDocuments } from '@/hooks';
 
 export default function DocumentsPage() {
@@ -13,33 +14,36 @@ export default function DocumentsPage() {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Knowledge Base</h1>
-              <p className="mt-1 text-gray-500">
+              <h1 className="text-2xl font-bold text-white">Knowledge Base</h1>
+              <p className="mt-1 text-gray-400">
                 These documents are used by our AI assistant to answer your questions.
               </p>
             </div>
             <button
               onClick={refetch}
               disabled={isLoading}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm font-medium text-gray-300 bg-neutral-800 border border-neutral-700 rounded-lg hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? 'Loading...' : 'Refresh'}
             </button>
           </div>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-lg">
-                <p className="text-sm text-red-600">{error}</p>
-              </div>
-            )}
-            <DocumentList documents={documents} isLoading={isLoading} />
+        {error && (
+          <div className="mb-6 p-4 bg-red-900/30 border border-red-800 rounded-lg">
+            <p className="text-sm text-red-400">{error}</p>
           </div>
-          <div className="lg:col-span-1">
-            <UploadForm onUploadComplete={refetch} />
-          </div>
+        )}
+
+        <DocumentList documents={documents} isLoading={isLoading} />
+
+        <div className="mt-8 p-4 bg-neutral-900 border border-neutral-800 rounded-lg">
+          <p className="text-sm text-gray-400">
+            Need to upload documents?{' '}
+            <Link href="/admin" className="text-blue-400 hover:text-blue-300 font-medium">
+              Go to Admin Panel
+            </Link>
+          </p>
         </div>
       </div>
     </MainLayout>

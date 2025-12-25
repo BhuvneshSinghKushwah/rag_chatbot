@@ -6,24 +6,31 @@ import { cn } from '@/lib/utils';
 
 interface DocumentCardProps {
   document: Document;
+  onView?: (doc: Document) => void;
 }
 
-export function DocumentCard({ document }: DocumentCardProps) {
+export function DocumentCard({ document, onView }: DocumentCardProps) {
   const fileIcon = getFileIcon(document.file_type);
 
+  const handleView = () => {
+    if (onView) {
+      onView(document);
+    }
+  };
+
   return (
-    <div className="border rounded-lg p-4 hover:shadow-md transition-shadow bg-white">
+    <div className="border border-neutral-700 rounded-lg p-4 hover:border-neutral-600 transition-all bg-neutral-900">
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-          <span className="text-xs font-bold text-gray-600">{fileIcon}</span>
+        <div className="flex-shrink-0 w-12 h-12 bg-neutral-800 rounded-lg flex items-center justify-center">
+          <span className="text-xs font-bold text-gray-400">{fileIcon}</span>
         </div>
 
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-gray-900 truncate" title={document.filename}>
+          <h3 className="font-medium text-white truncate" title={document.filename}>
             {document.filename}
           </h3>
 
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-gray-500 mt-1">
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-gray-400 mt-1">
             <span>{formatBytes(document.file_size_bytes)}</span>
             <span>{document.chunks_count} chunks</span>
             <span>Uploaded {formatDate(document.created_at)}</span>
@@ -34,25 +41,23 @@ export function DocumentCard({ document }: DocumentCardProps) {
               className={cn(
                 'inline-block px-2 py-1 text-xs rounded font-medium',
                 document.status === 'ready'
-                  ? 'bg-green-100 text-green-800'
+                  ? 'bg-green-900/30 text-green-400'
                   : document.status === 'processing'
-                  ? 'bg-yellow-100 text-yellow-800'
+                  ? 'bg-yellow-900/30 text-yellow-400'
                   : document.status === 'failed'
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-gray-100 text-gray-800'
+                  ? 'bg-red-900/30 text-red-400'
+                  : 'bg-neutral-800 text-gray-400'
               )}
             >
               {document.status}
             </span>
             {document.status === 'ready' && (
-              <a
-                href={`/api/documents/${document.id}/content`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-2 py-1 text-xs rounded font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors"
+              <button
+                onClick={handleView}
+                className="px-2 py-1 text-xs rounded font-medium bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 transition-colors"
               >
                 View
-              </a>
+              </button>
             )}
           </div>
         </div>

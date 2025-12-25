@@ -65,3 +65,23 @@ export function formatRelativeTime(dateString: string): string {
     return date.toLocaleDateString();
   }
 }
+
+export type DateGroup = 'Today' | 'Yesterday' | 'Last 7 days' | 'Older';
+
+export function getDateGroup(dateString: string): DateGroup {
+  const date = new Date(dateString);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(startOfToday.getTime() - 24 * 60 * 60 * 1000);
+  const startOf7DaysAgo = new Date(startOfToday.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  if (date >= startOfToday) {
+    return 'Today';
+  } else if (date >= startOfYesterday) {
+    return 'Yesterday';
+  } else if (date >= startOf7DaysAgo) {
+    return 'Last 7 days';
+  } else {
+    return 'Older';
+  }
+}
