@@ -5,6 +5,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=0
     container_name: support_frontend
     ports:
       - "${FRONTEND_PORT}:${FRONTEND_PORT}"
@@ -19,6 +21,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=0
     container_name: support_backend
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
@@ -83,9 +87,13 @@ services:
     build:
       context: ./backend/ollama
       dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=0
     container_name: support_ollama
     ports:
       - "${OLLAMA_PORT}:${OLLAMA_PORT}"
+    environment:
+      - OLLAMA_MODEL_NAME=${OLLAMA_MODEL_NAME}
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
