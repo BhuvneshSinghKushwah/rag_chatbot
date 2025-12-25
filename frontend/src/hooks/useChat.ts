@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ChatMessage, WebSocketMessage, ChatHistoryMessage } from '@/types/chat';
+import { ChatMessage, WebSocketMessage, ChatHistoryMessage, ChatError } from '@/types/chat';
 import { chatApi } from '@/services/api';
 import { useFingerprint } from './useFingerprint';
 import { useSession } from './useSession';
@@ -40,7 +40,7 @@ export function useChat() {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ChatError | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const streamingMessageRef = useRef<string>('');
@@ -141,7 +141,7 @@ export function useChat() {
 
       ws.onerror = () => {
         if (currentSessionRef.current === sid) {
-          setError('Connection error. Retrying...');
+          setError({ message: 'Connection error. Retrying...', isRetryable: true });
         }
       };
 
@@ -184,8 +184,14 @@ export function useChat() {
             streamingMessageRef.current = '';
             setIsLoading(false);
             window.dispatchEvent(new CustomEvent(CONVERSATIONS_UPDATED_EVENT));
-          } else if (data.type === 'error' || data.type === 'rate_limited') {
-            setError(data.message || 'An error occurred');
+          } else if (data.type === 'error' || data.type === 'rate_limited' || data.type === 'llm_error') {
+            const chatError: ChatError = {
+              message: data.message || 'An error occurred',
+              errorType: data.error_type,
+              retryAfter: data.retry_after,
+              isRetryable: data.is_retryable ?? (data.type === 'rate_limited'),
+            };
+            setError(chatError);
             setIsLoading(false);
             setMessages((prev) => {
               const lastMessage = prev[prev.length - 1];
@@ -196,7 +202,7 @@ export function useChat() {
             });
           }
         } catch {
-          setError('Failed to parse server response');
+          setError({ message: 'Failed to parse server response', isRetryable: false });
         }
       };
 
@@ -205,7 +211,7 @@ export function useChat() {
     } catch {
       isConnectingRef.current = false;
       if (currentSessionRef.current === sid) {
-        setError('Failed to connect to chat server');
+        setError({ message: 'Failed to connect to chat server', isRetryable: true });
       }
     }
   }, []);
@@ -236,9 +242,9 @@ export function useChat() {
 
 
   const sendMessage = useCallback(
-    (content: string) => {
+    (content: string, modelId?: string) => {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-        setError('Not connected to chat server');
+        setError({ message: 'Not connected to chat server', isRetryable: true });
         return;
       }
 
@@ -269,7 +275,11 @@ export function useChat() {
         return updated;
       });
 
-      wsRef.current.send(JSON.stringify({ type: 'message', content }));
+      const payload: { type: string; content: string; model_id?: string } = { type: 'message', content };
+      if (modelId) {
+        payload.model_id = modelId;
+      }
+      wsRef.current.send(JSON.stringify(payload));
     },
     []
   );

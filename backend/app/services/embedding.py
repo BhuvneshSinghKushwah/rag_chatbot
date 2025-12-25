@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 import httpx
+from sentence_transformers import SentenceTransformer
 
 from app.config import Settings, get_settings
 
@@ -137,6 +138,45 @@ class GeminiEmbedder(BaseEmbedder):
         return 768
 
 
+class LocalEmbedder(BaseEmbedder):
+    DIMENSIONS = {
+        "nomic-ai/nomic-embed-text-v1.5": 768,
+        "sentence-transformers/all-MiniLM-L6-v2": 384,
+        "sentence-transformers/all-mpnet-base-v2": 768,
+        "BAAI/bge-base-en-v1.5": 768,
+        "BAAI/bge-small-en-v1.5": 384,
+    }
+
+    def __init__(self, model: str = "nomic-ai/nomic-embed-text-v1.5"):
+        self.model_name = model
+        self._model: Optional[SentenceTransformer] = None
+
+    def _load_model(self) -> SentenceTransformer:
+        if self._model is None:
+            self._model = SentenceTransformer(self.model_name, trust_remote_code=True)
+        return self._model
+
+    async def embed(self, text: str) -> list[float]:
+        model = self._load_model()
+        embedding = model.encode(text, convert_to_numpy=True)
+        return embedding.tolist()
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        model = self._load_model()
+        embeddings = model.encode(texts, convert_to_numpy=True)
+        return embeddings.tolist()
+
+    async def warmup(self) -> None:
+        self._load_model()
+
+    async def close(self) -> None:
+        self._model = None
+
+    @property
+    def dimension(self) -> int:
+        return self.DIMENSIONS.get(self.model_name, 768)
+
+
 class EmbeddingService:
     def __init__(self, settings: Optional[Settings] = None):
         self.settings = settings or get_settings()
@@ -149,7 +189,11 @@ class EmbeddingService:
 
         provider = self.settings.DEFAULT_EMBEDDING_PROVIDER
 
-        if provider == "ollama":
+        if provider == "local":
+            self.embedder = LocalEmbedder(
+                self.settings.LOCAL_EMBEDDING_MODEL
+            )
+        elif provider == "ollama":
             self.embedder = OllamaEmbedder(
                 self.settings.OLLAMA_BASE_URL,
                 self.settings.OLLAMA_EMBEDDING_MODEL

@@ -71,8 +71,8 @@ export function Header({ onMenuClick }: HeaderProps) {
             ))}
           </nav>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:block text-xs text-gray-400">
+          <div className="flex items-center">
+            <div className="hidden md:block text-xs text-gray-400">
               Created by bhuvnesh
             </div>
           </div>

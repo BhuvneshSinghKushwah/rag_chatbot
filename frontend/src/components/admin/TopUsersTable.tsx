@@ -65,45 +65,45 @@ export function TopUsersTable() {
         </select>
       </div>
 
-      <div className="bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden">
-        <table className="w-full">
+      <div className="bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden overflow-x-auto">
+        <table className="w-full min-w-[400px]">
           <thead className="bg-neutral-900">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                 User
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Messages
+              <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                Msgs
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Conversations
+              <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                Convs
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-700">
             {users.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={3} className="px-3 sm:px-4 py-8 text-center text-gray-500">
                   No users found
                 </td>
               </tr>
             ) : (
               users.map((user, i) => (
                 <tr key={user.user_id} className="hover:bg-neutral-750">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-600/20 text-blue-400 rounded-full flex items-center justify-center text-sm font-medium">
+                  <td className="px-3 sm:px-4 py-3">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-600/20 text-blue-400 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium flex-shrink-0">
                         {i + 1}
                       </div>
-                      <span className="text-sm text-gray-200 font-mono">
-                        {user.user_id.slice(0, 12)}...
+                      <span className="text-xs sm:text-sm text-gray-200 font-mono truncate max-w-[80px] sm:max-w-none">
+                        {user.user_id.slice(0, 8)}...
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-300">
+                  <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm text-gray-300">
                     {user.message_count.toLocaleString()}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-300">
+                  <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm text-gray-300">
                     {user.conversation_count.toLocaleString()}
                   </td>
                 </tr>

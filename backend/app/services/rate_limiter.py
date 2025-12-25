@@ -40,28 +40,8 @@ class RateLimiter:
     async def resolve_user_id(
         self, fingerprint: str, request: Union[Request, WebSocket]
     ) -> str:
-        ip = self._get_client_ip(request)
         fp_hash = self._hash(fingerprint)
-        ip_hash = self._hash(ip)
-
-        fp_key = f"user:fp:{fp_hash}"
-        ip_key = f"user:ip:{ip_hash}"
-
-        user_id_from_fp = await self.redis.get(fp_key)
-        user_id_from_ip = await self.redis.get(ip_key)
-
-        if user_id_from_fp:
-            user_id = user_id_from_fp
-            await self.redis.set(ip_key, user_id, expire=IP_TTL)
-        elif user_id_from_ip:
-            user_id = user_id_from_ip
-            await self.redis.set(fp_key, user_id, expire=FP_TTL)
-        else:
-            user_id = uuid.uuid4().hex[:32]
-            await self.redis.set(fp_key, user_id, expire=FP_TTL)
-            await self.redis.set(ip_key, user_id, expire=IP_TTL)
-
-        return user_id
+        return fp_hash
 
     async def check_rate_limit(
         self, fingerprint: str, request: Union[Request, WebSocket]

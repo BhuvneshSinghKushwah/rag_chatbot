@@ -56,16 +56,16 @@ export function AnalyticsDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-white">Usage Analytics</h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-base sm:text-lg font-semibold text-white">Usage Analytics</h3>
         <select
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
-          className="px-3 py-2 bg-neutral-800 border border-neutral-700 text-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+          className="px-2 sm:px-3 py-1.5 sm:py-2 bg-neutral-800 border border-neutral-700 text-gray-300 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
         >
-          <option value={7}>Last 7 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={90}>Last 90 days</option>
+          <option value={7}>7 days</option>
+          <option value={30}>30 days</option>
+          <option value={90}>90 days</option>
         </select>
       </div>
 
@@ -99,9 +99,9 @@ export function AnalyticsDashboard() {
         />
       </div>
 
-      <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-4">
-        <h4 className="text-sm font-medium text-gray-300 mb-4">Daily Messages</h4>
-        <div className="h-48 flex items-end gap-1">
+      <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-3 sm:p-4 overflow-x-auto">
+        <h4 className="text-xs sm:text-sm font-medium text-gray-300 mb-3 sm:mb-4">Daily Messages</h4>
+        <div className="h-36 sm:h-48 flex items-end gap-0.5 sm:gap-1 min-w-[300px]">
           {data.daily.map((day, i) => (
             <div key={i} className="flex-1 flex flex-col items-center group">
               <div
@@ -110,7 +110,7 @@ export function AnalyticsDashboard() {
                 title={`${day.date}: ${day.messages} messages`}
               />
               {i % 7 === 0 && (
-                <span className="text-xs text-gray-500 mt-1 truncate w-full text-center">
+                <span className="text-[10px] sm:text-xs text-gray-500 mt-1 truncate w-full text-center">
                   {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </span>
               )}
@@ -130,11 +130,11 @@ interface StatCardProps {
 
 function StatCard({ label, value, icon }: StatCardProps) {
   return (
-    <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-4 flex items-center gap-4">
-      <div className="p-3 bg-blue-600/20 text-blue-400 rounded-lg">{icon}</div>
-      <div>
-        <p className="text-2xl font-bold text-white">{value.toLocaleString()}</p>
-        <p className="text-sm text-gray-400">{label}</p>
+    <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
+      <div className="p-2 sm:p-3 bg-blue-600/20 text-blue-400 rounded-lg flex-shrink-0">{icon}</div>
+      <div className="min-w-0">
+        <p className="text-xl sm:text-2xl font-bold text-white">{value.toLocaleString()}</p>
+        <p className="text-xs sm:text-sm text-gray-400 truncate">{label}</p>
       </div>
     </div>
   );

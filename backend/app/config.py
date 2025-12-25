@@ -21,7 +21,8 @@ class Settings(BaseSettings):
     LLM_TEMPERATURE: float = 0.2
     LLM_MAX_TOKENS: int = 2000
 
-    DEFAULT_EMBEDDING_PROVIDER: str = "ollama"
+    DEFAULT_EMBEDDING_PROVIDER: str = "local"
+    LOCAL_EMBEDDING_MODEL: str = "nomic-ai/nomic-embed-text-v1.5"
     OLLAMA_EMBEDDING_MODEL: str = "nomic-embed-text"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
     GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"

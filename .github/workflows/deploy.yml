@@ -1,0 +1,25 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /opt/rag-chatbot
+            git pull origin master
+            cd deploy
+            docker compose -f docker-compose.prod.yml up -d --build
+            docker system prune -f

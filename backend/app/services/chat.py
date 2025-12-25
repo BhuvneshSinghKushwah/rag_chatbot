@@ -1,48 +1,50 @@
+import logging
 from typing import Optional, AsyncIterator
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.llm import get_llm_service
-from app.services.memory import get_memory_service, get_memory_manager
+from app.services.memory import get_memory_service
 from app.services.qdrant import get_qdrant_service
 from app.db.postgres import Conversation, Message
 
+logger = logging.getLogger(__name__)
+
 
 SYSTEM_PROMPT = """
+You are a friendly customer support assistant. Talk like a helpful friend, not a salesman.
 
-Role: You are a friendly, helpful, and concise customer support representative.
+Keep responses brief. Only answer what was asked. No promotions or upselling.
 
-Perspective:
-- You represent our team: always use "we", "our", and "us".
-- Address the user directly: always use "you" and "your".
-- Prohibited Terms: Never use the phrases "the company" or "the customer".
+Use "we", "our", "us" when referring to the company. Use "you", "your" for the customer.
 
-Strict Response Guidelines:
-1. Exact Accuracy: State facts exactly as written in the <knowledge_base>. 
-2. No Modification: Do not infer, combine, or rephrase facts. If the information is not present, politely state that we do not have that information.
-3. Date/Year Protocol: If asked about a specific date or year, quote only the text associated with that date/year verbatim.
-4. History Access: You are permitted to share details from the <customer_history> with the user if they ask about information they have previously shared.
+You have access to the customer's previous conversations shown below. When they ask about past interactions, their name, or previous questions, refer to this history directly.
 
-Context:
-<knowledge_base>
-{rag_context}
-</knowledge_base>
-
-<customer_history>
+Previous Conversations:
 {memory_context}
-</customer_history>
 
-Execution: Process the user's request by strictly following the rules above.
+Product Information:
+{rag_context}
 
+Important:
+- If the customer asks about their previous questions or conversations, look at the Previous Conversations section above and answer based on that.
+- If they ask for their name and it appears in the history, tell them.
+- Be direct and concise.
 """
 
 
 class ChatService:
     def __init__(self):
         self.llm = get_llm_service()
-        self.memory = get_memory_service()
+        self.memory = None
         self.qdrant = get_qdrant_service()
+
+    async def _get_memory(self):
+        if self.memory is None:
+            self.memory = await get_memory_service()
+        return self.memory
 
     async def _get_rag_context(self, query: str, limit: int = 5) -> str:
         results = await self.qdrant.search(query=query, limit=limit)
@@ -58,12 +60,15 @@ class ChatService:
 
         return "\n\n".join(context_parts)
 
-    def _get_memory_context(self, query: str, user_id: str) -> str:
-        return self.memory.get_context(
+    async def _get_memory_context(self, query: str, user_id: str) -> str:
+        memory = await self._get_memory()
+        context = await memory.get_context(
             query=query,
             user_id=user_id,
             limit=5,
         )
+        logger.info(f"Memory context for user {user_id}: {context[:200] if context else 'empty'}")
+        return context
 
     def _build_system_prompt(self, rag_context: str, memory_context: str) -> str:
         return SYSTEM_PROMPT.format(
@@ -73,20 +78,17 @@ class ChatService:
 
     async def _update_memory(self, user_id: str, message: str, response: str) -> bool:
         try:
-            self.memory.add_conversation(
+            memory = await self._get_memory()
+            await memory.add_conversation(
                 messages=[
                     {"role": "user", "content": message},
                     {"role": "assistant", "content": response},
                 ],
                 user_id=user_id,
             )
-
-            manager = get_memory_manager()
-            if manager.needs_compaction(user_id):
-                await manager.compact_user_memory(user_id)
-
             return True
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to update memory for user {user_id}: {e}")
             return False
 
     async def get_or_create_conversation(
@@ -161,10 +163,10 @@ class ChatService:
         message: str,
         session_id: str,
         user_id: str,
-        provider: Optional[str] = None,
+        model_id: Optional[UUID] = None,
     ) -> tuple[str, bool]:
         rag_context = await self._get_rag_context(message)
-        memory_context = self._get_memory_context(message, user_id)
+        memory_context = await self._get_memory_context(message, user_id)
         system_prompt = self._build_system_prompt(rag_context, memory_context)
 
         chat_history = await self.get_chat_history(db, session_id, limit=10)
@@ -175,7 +177,7 @@ class ChatService:
             chat_history=chat_history,
         )
 
-        response, used_provider = await self.llm.invoke_with_fallback(messages, provider)
+        response = await self.llm.invoke(db, messages, model_id)
 
         conversation = await self.get_or_create_conversation(db, session_id, user_id)
         await self.save_message(db, conversation.id, "user", message)
@@ -191,10 +193,10 @@ class ChatService:
         message: str,
         session_id: str,
         user_id: str,
-        provider: Optional[str] = None,
+        model_id: Optional[UUID] = None,
     ) -> AsyncIterator[str]:
         rag_context = await self._get_rag_context(message)
-        memory_context = self._get_memory_context(message, user_id)
+        memory_context = await self._get_memory_context(message, user_id)
         system_prompt = self._build_system_prompt(rag_context, memory_context)
 
         chat_history = await self.get_chat_history(db, session_id, limit=10)
@@ -207,7 +209,7 @@ class ChatService:
 
         full_response = ""
 
-        async for chunk in self.llm.stream(messages, provider):
+        async for chunk in self.llm.stream(db, messages, model_id):
             full_response += chunk
             yield chunk
 

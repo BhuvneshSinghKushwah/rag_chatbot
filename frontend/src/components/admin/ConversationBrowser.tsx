@@ -96,11 +96,11 @@ export function ConversationBrowser() {
             Back to list
           </button>
 
-          <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-4">
-            <div className="mb-4 pb-4 border-b border-neutral-700">
-              <h4 className="font-medium text-white">Session: {detail.session_id.slice(0, 8)}...</h4>
-              <p className="text-sm text-gray-400">
-                User: {detail.user_id.slice(0, 8)}... | Created: {new Date(detail.created_at).toLocaleString()}
+          <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-3 sm:p-4">
+            <div className="mb-3 sm:mb-4 pb-3 sm:pb-4 border-b border-neutral-700">
+              <h4 className="font-medium text-white text-sm sm:text-base truncate">Session: {detail.session_id.slice(0, 8)}...</h4>
+              <p className="text-xs sm:text-sm text-gray-400 truncate">
+                {detail.user_id.slice(0, 8)}... | {new Date(detail.created_at).toLocaleDateString()}
               </p>
             </div>
 
@@ -111,12 +111,12 @@ export function ConversationBrowser() {
                 ))}
               </div>
             ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-2 sm:space-y-3 max-h-[60vh] overflow-y-auto">
                 {detail.messages.map((msg) => (
                   <div
                     key={msg.id}
-                    className={`p-3 rounded-lg ${
-                      msg.role === 'user' ? 'bg-blue-900/30 ml-8' : 'bg-neutral-700 mr-8'
+                    className={`p-2 sm:p-3 rounded-lg ${
+                      msg.role === 'user' ? 'bg-blue-900/30 ml-4 sm:ml-8' : 'bg-neutral-700 mr-4 sm:mr-8'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
@@ -125,7 +125,7 @@ export function ConversationBrowser() {
                         {new Date(msg.created_at).toLocaleTimeString()}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-200 whitespace-pre-wrap">{msg.content}</p>
+                    <p className="text-xs sm:text-sm text-gray-200 whitespace-pre-wrap break-words">{msg.content}</p>
                   </div>
                 ))}
               </div>
@@ -139,20 +139,20 @@ export function ConversationBrowser() {
               <button
                 key={conv.id}
                 onClick={() => setSelectedId(conv.id)}
-                className="w-full text-left p-4 bg-neutral-800 border border-neutral-700 rounded-lg hover:border-blue-500 hover:bg-neutral-750 transition-all"
+                className="w-full text-left p-3 sm:p-4 bg-neutral-800 border border-neutral-700 rounded-lg hover:border-blue-500 hover:bg-neutral-750 transition-all"
               >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-white">{conv.preview.slice(0, 50) || 'New conversation'}...</h4>
-                    <p className="text-sm text-gray-400">
-                      User: {conv.user_id.slice(0, 8)}... | {conv.message_count} messages
+                <div className="flex items-start sm:items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-medium text-white text-sm sm:text-base truncate">{conv.preview.slice(0, 50) || 'New conversation'}...</h4>
+                    <p className="text-xs sm:text-sm text-gray-400 truncate">
+                      {conv.user_id.slice(0, 8)}... | {conv.message_count} msgs
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex-shrink-0">
                     <p className="text-xs text-gray-500">
                       {new Date(conv.updated_at).toLocaleDateString()}
                     </p>
-                    <svg className="w-5 h-5 text-gray-500 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
@@ -162,21 +162,21 @@ export function ConversationBrowser() {
           </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4">
+            <div className="flex items-center justify-between pt-4 gap-2">
               <button
                 onClick={() => setOffset(Math.max(0, offset - limit))}
                 disabled={offset === 0}
-                className="px-4 py-2 text-sm font-medium text-gray-300 bg-neutral-800 border border-neutral-700 rounded-lg hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-300 bg-neutral-800 border border-neutral-700 rounded-lg hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Previous
+                Prev
               </button>
-              <span className="text-sm text-gray-400">
-                Page {currentPage} of {totalPages}
+              <span className="text-xs sm:text-sm text-gray-400">
+                {currentPage}/{totalPages}
               </span>
               <button
                 onClick={() => setOffset(offset + limit)}
                 disabled={currentPage >= totalPages}
-                className="px-4 py-2 text-sm font-medium text-gray-300 bg-neutral-800 border border-neutral-700 rounded-lg hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-300 bg-neutral-800 border border-neutral-700 rounded-lg hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>

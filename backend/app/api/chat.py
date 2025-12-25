@@ -1,3 +1,7 @@
+import logging
+from uuid import UUID
+from typing import Optional
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -15,11 +19,14 @@ from app.models.chat import (
     ConversationSummary,
     ConversationsListResponse,
 )
+from app.models.llm_config import AvailableModelsResponse
 from app.services.chat import get_chat_service
 from app.services.rate_limiter import RateLimiter
+from app.services.llm import LLMException, get_llm_service
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 async def get_rate_limiter() -> RateLimiter:
@@ -33,6 +40,7 @@ async def websocket_chat(
     websocket: WebSocket,
     session_id: str = Query(...),
     fingerprint: str = Query(...),
+    model_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     await websocket.accept()
@@ -43,12 +51,20 @@ async def websocket_chat(
     chat_service = get_chat_service()
 
     user_id = await rate_limiter.resolve_user_id(fingerprint, websocket)
+    parsed_model_id = UUID(model_id) if model_id else None
 
     try:
         while True:
             data = await websocket.receive_json()
             msg_type = data.get("type")
             content = data.get("content", "")
+            msg_model_id = data.get("model_id")
+
+            if msg_model_id:
+                try:
+                    parsed_model_id = UUID(msg_model_id)
+                except ValueError:
+                    pass
 
             if msg_type != "message" or not content:
                 await websocket.send_json(
@@ -76,6 +92,7 @@ async def websocket_chat(
                     message=content,
                     session_id=session_id,
                     user_id=user_id,
+                    model_id=parsed_model_id,
                 ):
                     if chunk:
                         await websocket.send_json(
@@ -86,9 +103,33 @@ async def websocket_chat(
                     WebSocketMessage(type="complete").model_dump()
                 )
 
+            except LLMException as e:
+                logger.warning(
+                    f"LLM error in chat stream",
+                    extra={
+                        "session_id": session_id,
+                        "user_id": user_id,
+                        "error_type": e.error.error_type,
+                        "provider": e.error.provider,
+                        "retry_after": e.error.retry_after,
+                    }
+                )
+                error_response = {
+                    "type": "llm_error",
+                    "message": e.error.user_message,
+                    "error_type": e.error.error_type,
+                    "retry_after": e.error.retry_after,
+                    "is_retryable": e.error.is_retryable,
+                }
+                await websocket.send_json(error_response)
+
             except Exception as e:
+                logger.error(
+                    f"Unexpected error in chat stream",
+                    extra={"session_id": session_id, "user_id": user_id, "error": str(e)[:200]}
+                )
                 await websocket.send_json(
-                    WebSocketMessage(type="error", message=str(e)).model_dump()
+                    WebSocketMessage(type="error", message="An unexpected error occurred. Please try again.").model_dump()
                 )
 
     except WebSocketDisconnect:
@@ -125,6 +166,7 @@ async def chat(
         message=chat_request.message,
         session_id=chat_request.session_id,
         user_id=user_id,
+        model_id=chat_request.model_id,
     )
 
     return ChatResponse(
@@ -247,3 +289,11 @@ async def list_conversations(
         )
 
     return ConversationsListResponse(conversations=summaries, total=len(summaries))
+
+
+@router.get("/models", response_model=AvailableModelsResponse)
+async def list_available_models(
+    db: AsyncSession = Depends(get_db),
+):
+    llm_service = get_llm_service()
+    return await llm_service.get_available_models(db)

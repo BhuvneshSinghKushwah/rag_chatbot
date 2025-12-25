@@ -32,11 +32,20 @@ export interface ChatHistoryResponse {
 }
 
 export interface WebSocketMessage {
-  type: 'token' | 'complete' | 'error' | 'rate_limited';
+  type: 'token' | 'complete' | 'error' | 'rate_limited' | 'llm_error';
   content?: string;
   message?: string;
   retry_after?: number;
   limits?: Record<string, RateLimitInfo>;
+  error_type?: string;
+  is_retryable?: boolean;
+}
+
+export interface ChatError {
+  message: string;
+  errorType?: string;
+  retryAfter?: number;
+  isRetryable?: boolean;
 }
 
 export interface RateLimitInfo {

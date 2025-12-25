@@ -1,5 +1,17 @@
 import { ChatRequest, ChatResponse, ChatHistoryResponse, ConversationsListResponse } from '@/types/chat';
 import { DocumentListResponse, Document, DocumentUploadResponse } from '@/types/document';
+import {
+  LLMProvider,
+  LLMProviderListResponse,
+  LLMProviderCreate,
+  LLMProviderUpdate,
+  LLMModel,
+  LLMModelCreate,
+  LLMModelUpdate,
+  AvailableModelsResponse,
+  TestProviderRequest,
+  TestProviderResponse,
+} from '@/types/llm';
 
 class ApiError extends Error {
   constructor(
@@ -249,6 +261,128 @@ export const adminApi = {
       headers: { 'X-Admin-Key': adminKey },
     });
     return handleResponse<ConversationDetail>(response);
+  },
+
+  async getProviders(adminKey: string): Promise<LLMProviderListResponse> {
+    const response = await fetch('/api/admin/llm/providers', {
+      headers: { 'X-Admin-Key': adminKey },
+    });
+    return handleResponse<LLMProviderListResponse>(response);
+  },
+
+  async createProvider(adminKey: string, data: LLMProviderCreate): Promise<LLMProvider> {
+    const response = await fetch('/api/admin/llm/providers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Key': adminKey,
+      },
+      body: JSON.stringify(data),
+    });
+    return handleResponse<LLMProvider>(response);
+  },
+
+  async updateProvider(adminKey: string, providerId: string, data: LLMProviderUpdate): Promise<LLMProvider> {
+    const response = await fetch(`/api/admin/llm/providers/${providerId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Key': adminKey,
+      },
+      body: JSON.stringify(data),
+    });
+    return handleResponse<LLMProvider>(response);
+  },
+
+  async deleteProvider(adminKey: string, providerId: string): Promise<void> {
+    const response = await fetch(`/api/admin/llm/providers/${providerId}`, {
+      method: 'DELETE',
+      headers: { 'X-Admin-Key': adminKey },
+    });
+    if (!response.ok) {
+      throw new ApiError(response.status, 'Failed to delete provider');
+    }
+  },
+
+  async setDefaultProvider(adminKey: string, providerId: string): Promise<void> {
+    const response = await fetch(`/api/admin/llm/providers/${providerId}/default`, {
+      method: 'PATCH',
+      headers: { 'X-Admin-Key': adminKey },
+    });
+    if (!response.ok) {
+      throw new ApiError(response.status, 'Failed to set default provider');
+    }
+  },
+
+  async createModel(adminKey: string, providerId: string, data: LLMModelCreate): Promise<LLMModel> {
+    const response = await fetch(`/api/admin/llm/providers/${providerId}/models`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Key': adminKey,
+      },
+      body: JSON.stringify(data),
+    });
+    return handleResponse<LLMModel>(response);
+  },
+
+  async updateModel(adminKey: string, modelId: string, data: LLMModelUpdate): Promise<LLMModel> {
+    const response = await fetch(`/api/admin/llm/models/${modelId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Key': adminKey,
+      },
+      body: JSON.stringify(data),
+    });
+    return handleResponse<LLMModel>(response);
+  },
+
+  async deleteModel(adminKey: string, modelId: string): Promise<void> {
+    const response = await fetch(`/api/admin/llm/models/${modelId}`, {
+      method: 'DELETE',
+      headers: { 'X-Admin-Key': adminKey },
+    });
+    if (!response.ok) {
+      throw new ApiError(response.status, 'Failed to delete model');
+    }
+  },
+
+  async setDefaultModel(adminKey: string, modelId: string): Promise<void> {
+    const response = await fetch(`/api/admin/llm/models/${modelId}/default`, {
+      method: 'PATCH',
+      headers: { 'X-Admin-Key': adminKey },
+    });
+    if (!response.ok) {
+      throw new ApiError(response.status, 'Failed to set default model');
+    }
+  },
+
+  async testProvider(adminKey: string, data: TestProviderRequest): Promise<TestProviderResponse> {
+    const response = await fetch('/api/admin/llm/providers/test', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Key': adminKey,
+      },
+      body: JSON.stringify(data),
+    });
+    return handleResponse<TestProviderResponse>(response);
+  },
+
+  async testExistingProvider(adminKey: string, providerId: string): Promise<TestProviderResponse> {
+    const response = await fetch(`/api/admin/llm/providers/${providerId}/test`, {
+      method: 'POST',
+      headers: { 'X-Admin-Key': adminKey },
+    });
+    return handleResponse<TestProviderResponse>(response);
+  },
+};
+
+export const modelsApi = {
+  async getAvailableModels(): Promise<AvailableModelsResponse> {
+    const response = await fetch('/api/chat/models');
+    return handleResponse<AvailableModelsResponse>(response);
   },
 };
 

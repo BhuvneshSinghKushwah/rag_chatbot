@@ -33,6 +33,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting application")
     await init_db()
     logger.info("Database initialized")
+
     await get_redis()
     logger.info("Redis connected")
     embedding_service = get_embedding_service()

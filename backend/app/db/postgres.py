@@ -2,11 +2,54 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, Text, Integer, BigInteger, ForeignKey, Index, UniqueConstraint
+from sqlalchemy import String, Text, Integer, BigInteger, Float, Boolean, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+
+
+class LLMProvider(Base):
+    __tablename__ = "llm_providers"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    api_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    base_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    models: Mapped[list["LLMModel"]] = relationship(back_populates="provider", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("idx_providers_active", "is_active"),
+        Index("idx_providers_type", "provider_type"),
+    )
+
+
+class LLMModel(Base):
+    __tablename__ = "llm_models"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("llm_providers.id", ondelete="CASCADE"), nullable=False)
+    model_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    display_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    max_tokens: Mapped[int] = mapped_column(Integer, default=4096)
+    temperature: Mapped[float] = mapped_column(Float, default=0.7)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+    provider: Mapped["LLMProvider"] = relationship(back_populates="models")
+
+    __table_args__ = (
+        UniqueConstraint("provider_id", "model_name", name="unique_model_per_provider"),
+        Index("idx_models_provider", "provider_id"),
+        Index("idx_models_active", "is_active"),
+    )
 
 
 class Document(Base):

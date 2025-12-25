@@ -15,6 +15,7 @@ qdrant-client
 
 # Embeddings
 httpx
+sentence-transformers
 
 # LangChain
 langchain
@@ -32,3 +33,5 @@ aiofiles
 
 # Memory
 mem0ai
+
+einops
