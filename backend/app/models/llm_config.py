@@ -10,6 +10,7 @@ class ProviderType(str, Enum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     OLLAMA = "ollama"
+    GROQ = "groq"
 
 
 class LLMModelCreate(BaseModel):

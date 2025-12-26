@@ -156,6 +156,14 @@ class LLMService:
                 base_url=base_url,
                 temperature=temperature,
             )
+        elif provider_type == "groq":
+            from langchain_groq import ChatGroq
+            return ChatGroq(
+                model=model_name,
+                api_key=api_key,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
         else:
             raise ValueError(f"Unknown provider type: {provider_type}")
 

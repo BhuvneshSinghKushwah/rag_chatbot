@@ -671,6 +671,14 @@ async def _test_provider_connection(
                 response = await client.get(f"{base_url}/api/tags")
                 if response.status_code != 200:
                     raise Exception(f"Ollama returned status {response.status_code}")
+        elif provider_type == ProviderType.GROQ:
+            from langchain_groq import ChatGroq
+            llm = ChatGroq(
+                model=model_name or "llama-3.3-70b-versatile",
+                api_key=api_key,
+                max_tokens=10,
+            )
+            await llm.ainvoke("Hi")
 
         return TestProviderResponse(
             success=True,

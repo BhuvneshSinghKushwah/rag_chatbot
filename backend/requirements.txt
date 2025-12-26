@@ -25,6 +25,7 @@ langchain-google-genai
 langchain-openai
 langchain-anthropic
 langchain-ollama
+langchain-groq
 
 # Document Processing
 python-docx

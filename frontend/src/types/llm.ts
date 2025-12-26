@@ -1,4 +1,4 @@
-export type ProviderType = 'gemini' | 'openai' | 'anthropic' | 'ollama';
+export type ProviderType = 'gemini' | 'openai' | 'anthropic' | 'ollama' | 'groq';
 
 export interface LLMModel {
   id: string;

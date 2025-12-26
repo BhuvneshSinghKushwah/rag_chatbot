@@ -11,6 +11,7 @@ const PROVIDER_TYPES: { value: ProviderType; label: string }[] = [
   { value: 'openai', label: 'OpenAI' },
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'ollama', label: 'Ollama' },
+  { value: 'groq', label: 'Groq' },
 ];
 
 export function ProviderManager() {

@@ -29,8 +29,10 @@ Product Information:
 {rag_context}
 
 Important:
-- If the customer asks about their previous questions or conversations, look at the Previous Conversations section above and answer based on that.
-- If they ask for their name and it appears in the history, tell them.
+- You MUST ONLY answer based on the Product Information provided above. Do not answer from your general knowledge.
+- If Product Information contains relevant content, use ONLY that to answer. Never add information beyond what is provided.
+- If the Product Information does not contain the answer, respond with: "I don't have information about that in our knowledge base. Is there something else I can help you with?"
+- For questions about previous conversations or the customer's name, refer to the Previous Conversations section.
 - Be direct and concise.
 """
 
