@@ -42,9 +42,9 @@ class Settings(BaseSettings):
     ADMIN_API_KEY: str = "admin-secret-key"
 
     RATE_LIMIT_SALT: str = "change_this_to_random_secret"
-    RATE_LIMIT_PER_MINUTE: int = 10
-    RATE_LIMIT_PER_HOUR: int = 100
-    RATE_LIMIT_PER_DAY: int = 500
+    RATE_LIMIT_PER_MINUTE: int = 60
+    RATE_LIMIT_PER_HOUR: int = 600
+    RATE_LIMIT_PER_DAY: int = 1000
 
     MEMORY_MAX_PER_USER: int = 100
     MEMORY_COMPACTION_THRESHOLD: int = 80

@@ -1,29 +1,45 @@
-# Customer Support Chat with RAG + Memory
+# RAG Chatbot
 
-A web app that simulates customer support chat where an AI agent answers user questions using RAG (Retrieval Augmented Generation) with persistent memory, backed by company documents.
+A production-ready customer support chatbot powered by RAG (Retrieval Augmented Generation) with persistent memory. Upload your company documents and let AI answer questions with context-aware, accurate responses.
+
+![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?logo=fastapi&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
 
 ## Features
 
-- Real-time chat with streaming responses via WebSocket
-- RAG-powered answers from uploaded company documents
-- Persistent user memory across sessions (Mem0)
-- Multiple LLM provider support (Ollama, Gemini, OpenAI, Anthropic)
-- Document upload and management (PDF, DOCX, MD, TXT)
-- Rate limiting with fingerprint-based user identification
-- Fully containerized with Docker
+- **Real-time Streaming** - WebSocket-powered chat with token-by-token streaming
+- **RAG Pipeline** - Answers grounded in your uploaded documents (PDF, DOCX, MD, TXT)
+- **Persistent Memory** - Remembers user context across sessions using Mem0
+- **Multi-LLM Support** - Switch between Gemini, OpenAI, Anthropic, Groq, or Ollama
+- **Local Embeddings** - Privacy-first with nomic-embed-text running locally
+- **Admin Dashboard** - Manage documents, view analytics, configure providers
+- **Rate Limiting** - Fingerprint-based user identification and throttling
 
 ## Architecture
 
 ```
-Frontend (Next.js)  -->  Backend (FastAPI)  -->  LLM Router
-                              |
-                    +---------+---------+
-                    |         |         |
-                  Redis    Qdrant   PostgreSQL
-                 (cache)  (vectors)   (data)
-                              |
-                           Ollama
-                        (embeddings)
+                    +------------------+
+                    |   Next.js App    |
+                    |   (Frontend)     |
+                    +--------+---------+
+                             |
+                             | WebSocket / REST
+                             v
+                    +--------+---------+
+                    |    FastAPI       |
+                    |    (Backend)     |
+                    +--------+---------+
+                             |
+         +-------------------+-------------------+
+         |                   |                   |
+         v                   v                   v
+   +-----+-----+       +-----+-----+       +-----+-----+
+   |   Redis   |       |   Qdrant  |       | PostgreSQL|
+   |  (Cache)  |       | (Vectors) |       |  (Data)   |
+   +-----------+       +-----------+       +-----------+
 ```
 
 ## Quick Start
@@ -31,45 +47,50 @@ Frontend (Next.js)  -->  Backend (FastAPI)  -->  LLM Router
 ### Prerequisites
 
 - Docker and Docker Compose
-- 4GB+ RAM for Ollama
 
 ### Installation
 
-1. Clone the repository:
 ```bash
-git clone <repo-url>
+# Clone the repository
+git clone https://github.com/BhuvneshSinghKushwah/rag_chatbot.git
 cd rag_chatbot
-```
 
-2. Copy environment file:
-```bash
+# Copy environment file
 cp .env.example .env
-```
 
-3. Start all services:
-```bash
+# Start all services
 docker-compose up -d
 ```
 
-4. Access the app:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
+### Access Points
 
-First startup takes a few minutes as Ollama downloads the embedding model.
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8000 |
+| API Docs | http://localhost:8000/docs |
+
+### Configure LLM
+
+1. Go to Admin Panel > Settings
+2. Add your LLM provider credentials
+3. Add models and set a default
+
+> First startup downloads the embedding model (~250MB) which runs locally.
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| Frontend | Next.js, React, Tailwind CSS |
-| Backend | Python 3.11+, FastAPI |
-| LLM | Ollama (default), Gemini, OpenAI, Anthropic |
-| Embeddings | nomic-embed-text (Ollama) |
-| Vector DB | Qdrant |
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js 14, React, Tailwind CSS |
+| Backend | Python 3.11+, FastAPI, WebSockets |
+| LLM Providers | Gemini, OpenAI, Anthropic, Groq, Ollama |
+| Embeddings | nomic-embed-text-v1.5 (local) |
+| Vector Store | Qdrant |
 | Database | PostgreSQL |
 | Cache | Redis |
 | Memory | Mem0 |
+| Deployment | Docker, Docker Compose |
 
 ## Project Structure
 
@@ -77,73 +98,72 @@ First startup takes a few minutes as Ollama downloads the embedding model.
 rag_chatbot/
 ├── backend/
 │   ├── app/
-│   │   ├── api/           # API endpoints
-│   │   ├── services/      # Business logic
-│   │   ├── models/        # Pydantic models
+│   │   ├── api/           # REST & WebSocket endpoints
+│   │   ├── services/      # RAG, LLM, Memory services
+│   │   ├── models/        # Pydantic schemas
 │   │   └── db/            # Database connections
-│   ├── ollama/            # Ollama Dockerfile
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
 │   │   ├── components/    # React components
 │   │   ├── pages/         # Next.js pages
-│   │   ├── hooks/         # Custom hooks
+│   │   ├── hooks/         # Custom React hooks
 │   │   └── services/      # API clients
 │   └── Dockerfile
 ├── docker-compose.yml
-├── .env.example
-└── plan.md               # Detailed implementation plan
+└── .env.example
 ```
 
-## API Endpoints
+## API Reference
 
 ### Chat
-- `WebSocket /api/chat/ws` - Real-time chat with streaming
-- `POST /api/chat` - Non-streaming chat fallback
-- `GET /api/chat/history/{session_id}` - Get chat history
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| WebSocket | `/api/chat/ws` | Real-time streaming chat |
+| POST | `/api/chat` | Non-streaming fallback |
+| GET | `/api/chat/history/{session_id}` | Retrieve chat history |
 
 ### Documents
-- `GET /api/documents` - List all documents
-- `POST /api/documents/upload` - Upload document (admin only)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/documents` | List all documents |
+| POST | `/api/documents/upload` | Upload document (admin) |
 
 ### Admin
-- `GET /api/conversations` - List all conversations
-- `GET /api/analytics/usage` - Usage statistics
-
-## Configuration
-
-Key environment variables (see `.env.example` for full list):
-
-```bash
-# LLM Provider
-DEFAULT_LLM_PROVIDER=ollama
-OLLAMA_MODEL_NAME=llama3.2
-
-# Embeddings
-DEFAULT_EMBEDDING_PROVIDER=ollama
-OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-
-# Security
-ADMIN_API_KEY=your-admin-key
-RATE_LIMIT_SALT=random-string
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/conversations` | List conversations |
+| GET | `/api/analytics/usage` | Usage statistics |
 
 ## Development
 
-### Backend only
+### Backend
 ```bash
 cd backend
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-### Frontend only
+### Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
+## Configuration
+
+LLM providers and API keys are managed through the Admin Panel at runtime - no redeployment needed.
+
+See `.env.example` for infrastructure settings.
+
 ## License
 
 MIT
+
+---
+
+### Connect
+
+[![GitHub](https://img.shields.io/badge/GitHub-BhuvneshSinghKushwah-181717?logo=github&logoColor=white)](https://github.com/BhuvneshSinghKushwah)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Bhuvnesh_Singh_Kushwah-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/bhuvnesh-singh-kushwah/)
