@@ -1,5 +1,7 @@
 import logging
 from logging.handlers import TimedRotatingFileHandler
+import os
+from pathlib import Path
 import sys
 import time
 import uuid
@@ -19,8 +21,12 @@ from app.api.admin import router as admin_router
 
 settings = get_settings()
 
+# Create logs directory at project root
+LOG_DIR = Path(__file__).parent.parent.parent / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+
 file_handler = TimedRotatingFileHandler(
-    "logs/app.log",
+    LOG_DIR / "app.log",
     when="midnight",
     interval=1,
     backupCount=7,

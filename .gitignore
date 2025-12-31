@@ -15,3 +15,5 @@ setup-server.sh
 deploy
 
 *.log
+
+logs
