@@ -1,4 +1,5 @@
 import logging
+from logging.handlers import TimedRotatingFileHandler
 import sys
 import time
 import uuid
@@ -18,11 +19,22 @@ from app.api.admin import router as admin_router
 
 settings = get_settings()
 
+file_handler = TimedRotatingFileHandler(
+    "logs/app.log",
+    when="midnight",
+    interval=1,
+    backupCount=7,
+)
+file_handler.suffix = "%Y-%m-%d"
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=[logging.StreamHandler(sys.stdout)],
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        file_handler,
+    ],
 )
 
 logger = logging.getLogger("app")

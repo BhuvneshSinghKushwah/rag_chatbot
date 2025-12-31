@@ -9,7 +9,9 @@ CLAUDE.*
 
 **/data/
 
-plan.*
+plans/*
 setup-server.sh
 
 deploy
+
+*.log
