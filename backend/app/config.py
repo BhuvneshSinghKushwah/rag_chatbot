@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 800
     CHUNK_SEPARATORS: list[str] = ["\n\n", "\n", ". ", " ", ""]
 
+    SEARXNG_BASE_URL: str = "http://searxng:8080"
+    WEB_SEARCH_ENABLED: bool = True
+    WEB_SEARCH_MAX_RESULTS: int = 5
+    RAG_RELEVANCE_THRESHOLD: float = 0.65
+
     @property
     def database_url(self) -> str:
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"

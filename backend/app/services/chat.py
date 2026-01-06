@@ -1,19 +1,38 @@
 import logging
+import asyncio
 from typing import Optional, AsyncIterator
 from uuid import UUID
+from enum import Enum
+from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.services.llm import get_llm_service
 from app.services.memory import get_memory_service
 from app.services.qdrant import get_qdrant_service
+from app.services.web_search import get_web_search_service
 from app.db.postgres import Conversation, Message
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
-SYSTEM_PROMPT = """
+class ContextSource(str, Enum):
+    DOCUMENTS = "documents"
+    WEB = "web"
+    NONE = "none"
+
+
+@dataclass
+class ContextResult:
+    source: ContextSource
+    content: str
+    sources: list[str]
+
+
+SYSTEM_PROMPT_DOCUMENTS = """
 You are a friendly customer support assistant. Talk like a helpful friend, not a salesman.
 
 Keep responses brief. Only answer what was asked. No promotions or upselling.
@@ -36,23 +55,75 @@ Important:
 - Be direct and concise.
 """
 
+SYSTEM_PROMPT_WEB = """
+You are a friendly customer support assistant. Talk like a helpful friend, not a salesman.
+
+Keep responses brief. Only answer what was asked. No promotions or upselling.
+
+Use "we", "our", "us" when referring to the company. Use "you", "your" for the customer.
+
+You have access to the customer's previous conversations shown below. When they ask about past interactions, their name, or previous questions, refer to this history directly.
+
+Previous Conversations:
+{memory_context}
+
+IMPORTANT: The answer was not found in our company documents, so I searched the web for you.
+
+Web Search Results:
+{rag_context}
+
+Important:
+- Use the web search results above to answer the question.
+- Always mention that this information comes from web search, not our official documents.
+- Web results may not reflect official company policies.
+- If the web results don't contain a good answer, say so clearly.
+- Be direct and concise.
+"""
+
+SYSTEM_PROMPT_NONE = """
+You are a friendly customer support assistant. Talk like a helpful friend, not a salesman.
+
+Keep responses brief. Only answer what was asked. No promotions or upselling.
+
+Use "we", "our", "us" when referring to the company. Use "you", "your" for the customer.
+
+You have access to the customer's previous conversations shown below. When they ask about past interactions, their name, or previous questions, refer to this history directly.
+
+Previous Conversations:
+{memory_context}
+
+No relevant information found:
+{rag_context}
+
+Important:
+- I could not find relevant information in our documents or on the web.
+- Politely explain that you don't have information about this topic.
+- Suggest the customer contact support directly or ask a different question.
+- Be direct and concise.
+"""
+
 
 class ChatService:
     def __init__(self):
         self.llm = get_llm_service()
         self.memory = None
         self.qdrant = get_qdrant_service()
+        self.web_search = get_web_search_service()
+        self.relevance_threshold = settings.RAG_RELEVANCE_THRESHOLD
+        self.web_search_enabled = settings.WEB_SEARCH_ENABLED
 
     async def _get_memory(self):
         if self.memory is None:
             self.memory = await get_memory_service()
         return self.memory
 
-    async def _get_rag_context(self, query: str, limit: int = 5) -> str:
+    async def _get_rag_context(self, query: str, limit: int = 5) -> tuple[str, float]:
         results = await self.qdrant.search(query=query, limit=limit)
 
         if not results:
-            return ""
+            return "", 0.0
+
+        top_score = results[0].get("score", 0.0) if results else 0.0
 
         context_parts = []
         for result in results:
@@ -60,7 +131,50 @@ class ChatService:
             if content:
                 context_parts.append(content)
 
-        return "\n\n".join(context_parts)
+        return "\n\n".join(context_parts), top_score
+
+    async def _get_context_with_fallback(self, query: str) -> ContextResult:
+        if self.web_search_enabled:
+            rag_task = self._get_rag_context(query)
+            web_task = self.web_search.search(
+                query=query,
+                num_results=settings.WEB_SEARCH_MAX_RESULTS
+            )
+            (rag_context, top_score), web_results = await asyncio.gather(
+                rag_task, web_task
+            )
+        else:
+            rag_context, top_score = await self._get_rag_context(query)
+            web_results = []
+
+        if rag_context and top_score >= self.relevance_threshold:
+            logger.info(f"Using RAG context (score: {top_score:.3f})")
+            return ContextResult(
+                source=ContextSource.DOCUMENTS,
+                content=rag_context,
+                sources=[]
+            )
+
+        if web_results:
+            logger.info(f"RAG score too low ({top_score:.3f}), using web search results")
+            return ContextResult(
+                source=ContextSource.WEB,
+                content=self.web_search.format_results(web_results),
+                sources=self.web_search.get_source_urls(web_results)
+            )
+
+        if rag_context:
+            return ContextResult(
+                source=ContextSource.DOCUMENTS,
+                content=rag_context,
+                sources=[]
+            )
+
+        return ContextResult(
+            source=ContextSource.NONE,
+            content="No relevant information found.",
+            sources=[]
+        )
 
     async def _get_memory_context(self, query: str, user_id: str) -> str:
         memory = await self._get_memory()
@@ -72,9 +186,20 @@ class ChatService:
         logger.info(f"Memory context for user {user_id}: {context[:200] if context else 'empty'}")
         return context
 
-    def _build_system_prompt(self, rag_context: str, memory_context: str) -> str:
-        return SYSTEM_PROMPT.format(
-            rag_context=rag_context if rag_context else "No relevant information.",
+    def _build_system_prompt(
+        self,
+        context_result: ContextResult,
+        memory_context: str
+    ) -> str:
+        if context_result.source == ContextSource.DOCUMENTS:
+            template = SYSTEM_PROMPT_DOCUMENTS
+        elif context_result.source == ContextSource.WEB:
+            template = SYSTEM_PROMPT_WEB
+        else:
+            template = SYSTEM_PROMPT_NONE
+
+        return template.format(
+            rag_context=context_result.content if context_result.content else "No relevant information.",
             memory_context=memory_context if memory_context else "No previous interactions.",
         )
 
@@ -166,10 +291,10 @@ class ChatService:
         session_id: str,
         user_id: str,
         model_id: Optional[UUID] = None,
-    ) -> tuple[str, bool]:
-        rag_context = await self._get_rag_context(message)
+    ) -> tuple[str, bool, ContextResult]:
+        context_result = await self._get_context_with_fallback(message)
         memory_context = await self._get_memory_context(message, user_id)
-        system_prompt = self._build_system_prompt(rag_context, memory_context)
+        system_prompt = self._build_system_prompt(context_result, memory_context)
 
         chat_history = await self.get_chat_history(db, session_id, limit=10)
 
@@ -187,7 +312,7 @@ class ChatService:
 
         memory_updated = await self._update_memory(user_id, message, response)
 
-        return response, memory_updated
+        return response, memory_updated, context_result
 
     async def chat_stream(
         self,
@@ -196,10 +321,10 @@ class ChatService:
         session_id: str,
         user_id: str,
         model_id: Optional[UUID] = None,
-    ) -> AsyncIterator[str]:
-        rag_context = await self._get_rag_context(message)
+    ) -> AsyncIterator[tuple[str, Optional[ContextResult]]]:
+        context_result = await self._get_context_with_fallback(message)
         memory_context = await self._get_memory_context(message, user_id)
-        system_prompt = self._build_system_prompt(rag_context, memory_context)
+        system_prompt = self._build_system_prompt(context_result, memory_context)
 
         chat_history = await self.get_chat_history(db, session_id, limit=10)
 
@@ -210,10 +335,15 @@ class ChatService:
         )
 
         full_response = ""
+        first_chunk = True
 
         async for chunk in self.llm.stream(db, messages, model_id):
             full_response += chunk
-            yield chunk
+            if first_chunk:
+                yield chunk, context_result
+                first_chunk = False
+            else:
+                yield chunk, None
 
         conversation = await self.get_or_create_conversation(db, session_id, user_id)
         await self.save_message(db, conversation.id, "user", message)

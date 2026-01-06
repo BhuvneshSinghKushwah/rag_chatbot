@@ -12,6 +12,7 @@ A production-ready customer support chatbot powered by RAG (Retrieval Augmented 
 
 - **Real-time Streaming** - WebSocket-powered chat with token-by-token streaming
 - **RAG Pipeline** - Answers grounded in your uploaded documents (PDF, DOCX, MD, TXT)
+- **Web Search Fallback** - Automatically searches the web via SearXNG when documents lack relevant content
 - **Persistent Memory** - Remembers user context across sessions using Mem0
 - **Multi-LLM Support** - Switch between Gemini, OpenAI, Anthropic, Groq, or Ollama
 - **Local Embeddings** - Privacy-first with nomic-embed-text running locally
@@ -33,13 +34,13 @@ A production-ready customer support chatbot powered by RAG (Retrieval Augmented 
                     |    (Backend)     |
                     +--------+---------+
                              |
-         +-------------------+-------------------+
-         |                   |                   |
-         v                   v                   v
-   +-----+-----+       +-----+-----+       +-----+-----+
-   |   Redis   |       |   Qdrant  |       | PostgreSQL|
-   |  (Cache)  |       | (Vectors) |       |  (Data)   |
-   +-----------+       +-----------+       +-----------+
+    +------------+-----------+-----------+------------+
+    |            |           |           |            |
+    v            v           v           v            v
++---+---+  +-----+-----+ +---+---+ +-----+-----+ +----+----+
+| Redis |  |   Qdrant  | |SearXNG| | PostgreSQL| |  LLM    |
+|(Cache)|  | (Vectors) | | (Web) | |  (Data)   | |Provider |
++-------+  +-----------+ +-------+ +-----------+ +---------+
 ```
 
 ## Quick Start
@@ -69,6 +70,7 @@ docker-compose up -d
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:8000 |
 | API Docs | http://localhost:8000/docs |
+| SearXNG | http://localhost:8080 |
 
 ### Configure LLM
 
@@ -87,6 +89,7 @@ docker-compose up -d
 | LLM Providers | Gemini, OpenAI, Anthropic, Groq, Ollama |
 | Embeddings | nomic-embed-text-v1.5 (local) |
 | Vector Store | Qdrant |
+| Web Search | SearXNG (self-hosted metasearch) |
 | Database | PostgreSQL |
 | Cache | Redis |
 | Memory | Mem0 |
@@ -156,6 +159,23 @@ npm run dev
 LLM providers and API keys are managed through the Admin Panel at runtime - no redeployment needed.
 
 See `.env.example` for infrastructure settings.
+
+### Web Search
+
+The chatbot automatically falls back to web search when uploaded documents don't contain relevant answers. This uses SearXNG, a privacy-respecting metasearch engine that aggregates results from Google, Bing, DuckDuckGo, and more.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `WEB_SEARCH_ENABLED` | `true` | Enable/disable web search fallback |
+| `RAG_RELEVANCE_THRESHOLD` | `0.65` | Minimum RAG score to use documents (0-1) |
+| `WEB_SEARCH_MAX_RESULTS` | `5` | Number of web results to fetch |
+
+**How it works:**
+1. User sends a question
+2. RAG and web search run in parallel
+3. If RAG score >= threshold, use document results
+4. If RAG score < threshold, use web search results
+5. LLM generates response from the selected context
 
 ## License
 

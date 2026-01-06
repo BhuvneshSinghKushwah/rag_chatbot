@@ -18,6 +18,8 @@ from app.models.chat import (
     WebSocketMessage,
     ConversationSummary,
     ConversationsListResponse,
+    SourceInfo,
+    ContextSourceType,
 )
 from app.models.llm_config import AvailableModelsResponse
 from app.services.chat import get_chat_service
@@ -87,7 +89,8 @@ async def websocket_chat(
             await rate_limiter.increment(fingerprint, websocket)
 
             try:
-                async for chunk in chat_service.chat_stream(
+                source_info_sent = False
+                async for chunk, context_result in chat_service.chat_stream(
                     db=db,
                     message=content,
                     session_id=session_id,
@@ -95,9 +98,14 @@ async def websocket_chat(
                     model_id=parsed_model_id,
                 ):
                     if chunk:
-                        await websocket.send_json(
-                            WebSocketMessage(type="token", content=chunk).model_dump()
-                        )
+                        msg = WebSocketMessage(type="token", content=chunk)
+                        if context_result and not source_info_sent:
+                            msg.source_info = SourceInfo(
+                                source_type=ContextSourceType(context_result.source.value),
+                                sources=context_result.sources
+                            )
+                            source_info_sent = True
+                        await websocket.send_json(msg.model_dump())
 
                 await websocket.send_json(
                     WebSocketMessage(type="complete").model_dump()
@@ -161,7 +169,7 @@ async def chat(
 
     chat_service = get_chat_service()
 
-    response, memory_updated = await chat_service.chat(
+    response, memory_updated, context_result = await chat_service.chat(
         db=db,
         message=chat_request.message,
         session_id=chat_request.session_id,
@@ -174,6 +182,10 @@ async def chat(
         session_id=chat_request.session_id,
         user_id=user_id,
         memory_updated=memory_updated,
+        source_info=SourceInfo(
+            source_type=ContextSourceType(context_result.source.value),
+            sources=context_result.sources
+        ),
     )
 
 

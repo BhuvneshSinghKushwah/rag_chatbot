@@ -1,0 +1,49 @@
+use_default_settings: true
+
+server:
+  secret_key: "${SEARXNG_SECRET_KEY}"
+  limiter: false
+  image_proxy: false
+  method: "GET"
+
+ui:
+  static_use_hash: true
+  default_theme: simple
+  theme_args:
+    simple_style: dark
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "en"
+  formats:
+    - html
+    - json
+
+general:
+  instance_name: "RAG Chatbot Search"
+  enable_metrics: false
+
+engines:
+  - name: google
+    disabled: false
+    weight: 1.5
+  - name: bing
+    disabled: false
+    weight: 1.2
+  - name: duckduckgo
+    disabled: false
+    weight: 1.0
+  - name: wikipedia
+    disabled: false
+    weight: 0.8
+  - name: brave
+    disabled: false
+    weight: 1.0
+
+outgoing:
+  request_timeout: 5.0
+  max_request_timeout: 10.0
+  useragent_suffix: ""
+  pool_connections: 100
+  pool_maxsize: 20

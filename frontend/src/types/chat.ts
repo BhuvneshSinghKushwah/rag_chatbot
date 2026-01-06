@@ -1,9 +1,17 @@
+export type ContextSourceType = 'documents' | 'web' | 'none';
+
+export interface SourceInfo {
+  source_type: ContextSourceType;
+  sources: string[];
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   createdAt: Date;
   isStreaming?: boolean;
+  sourceInfo?: SourceInfo;
 }
 
 export interface ChatRequest {
@@ -39,6 +47,7 @@ export interface WebSocketMessage {
   limits?: Record<string, RateLimitInfo>;
   error_type?: string;
   is_retryable?: boolean;
+  source_info?: SourceInfo;
 }
 
 export interface ChatError {
