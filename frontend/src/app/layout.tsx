@@ -6,8 +6,8 @@ import { Providers } from './providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Customer Support Chat',
-  description: 'AI-powered customer support with RAG',
+  title: 'chat.porygonlabs.dev - RAG-as-a-Service Platform',
+  description: 'Open-source, self-hosted RAG-as-a-Service. Turn any document into a production-ready chatbot API in minutes.',
 };
 
 export default function RootLayout({
