@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ChatMessage, WebSocketMessage, ChatHistoryMessage, ChatError } from '@/types/chat';
+import { ChatMessage, WebSocketMessage, ChatHistoryMessage, ChatError, SourceInfo } from '@/types/chat';
 import { chatApi } from '@/services/api';
 import { useFingerprint } from './useFingerprint';
 import { useSession } from './useSession';
@@ -44,6 +44,7 @@ export function useChat() {
 
   const wsRef = useRef<WebSocket | null>(null);
   const streamingMessageRef = useRef<string>('');
+  const streamingSourceInfoRef = useRef<SourceInfo | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const isConnectingRef = useRef(false);
   const currentSessionRef = useRef<string | null>(null);
@@ -153,6 +154,9 @@ export function useChat() {
 
           if (data.type === 'token' && data.content) {
             streamingMessageRef.current += data.content;
+            if (data.source_info && !streamingSourceInfoRef.current) {
+              streamingSourceInfoRef.current = data.source_info;
+            }
             setMessages((prev) => {
               const lastMessage = prev[prev.length - 1];
               if (lastMessage?.isStreaming) {
@@ -164,6 +168,7 @@ export function useChat() {
               return prev;
             });
           } else if (data.type === 'complete') {
+            const sourceInfo = streamingSourceInfoRef.current;
             setMessages((prev) => {
               const lastMessage = prev[prev.length - 1];
               if (lastMessage?.isStreaming) {
@@ -172,6 +177,7 @@ export function useChat() {
                   {
                     ...lastMessage,
                     isStreaming: false,
+                    sourceInfo: sourceInfo || undefined,
                   },
                 ];
                 if (currentSessionRef.current) {
@@ -182,6 +188,7 @@ export function useChat() {
               return prev;
             });
             streamingMessageRef.current = '';
+            streamingSourceInfoRef.current = null;
             setIsLoading(false);
             window.dispatchEvent(new CustomEvent(CONVERSATIONS_UPDATED_EVENT));
           } else if (data.type === 'error' || data.type === 'rate_limited' || data.type === 'llm_error') {
@@ -251,6 +258,7 @@ export function useChat() {
       setError(null);
       setIsLoading(true);
       streamingMessageRef.current = '';
+      streamingSourceInfoRef.current = null;
 
       const userMessage: ChatMessage = {
         id: crypto.randomUUID(),

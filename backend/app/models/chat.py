@@ -2,6 +2,18 @@ import uuid
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
+from enum import Enum
+
+
+class ContextSourceType(str, Enum):
+    DOCUMENTS = "documents"
+    WEB = "web"
+    NONE = "none"
+
+
+class SourceInfo(BaseModel):
+    source_type: ContextSourceType
+    sources: list[str] = []
 
 
 class ChatRequest(BaseModel):
@@ -16,6 +28,7 @@ class ChatResponse(BaseModel):
     session_id: str
     user_id: str
     memory_updated: bool
+    source_info: Optional[SourceInfo] = None
 
 
 class ChatHistoryMessage(BaseModel):
@@ -38,6 +51,7 @@ class WebSocketMessage(BaseModel):
     limits: Optional[dict] = None
     error_type: Optional[str] = None
     is_retryable: Optional[bool] = None
+    source_info: Optional[SourceInfo] = None
 
 
 class RateLimitInfo(BaseModel):
