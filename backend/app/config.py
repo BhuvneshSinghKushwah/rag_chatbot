@@ -62,6 +62,34 @@ class Settings(BaseSettings):
     WEB_SEARCH_MAX_RESULTS: int = 5
     RAG_RELEVANCE_THRESHOLD: float = 0.65
 
+    # Firebase Authentication
+    FIREBASE_PROJECT_ID: Optional[str] = None
+    FIREBASE_CLIENT_EMAIL: Optional[str] = None
+    FIREBASE_PRIVATE_KEY: Optional[str] = None
+
+    # Demo Mode
+    DEMO_RATE_LIMIT_PER_MINUTE: int = 10
+    DEMO_RATE_LIMIT_PER_HOUR: int = 50
+    DEMO_CONVERSATION_TTL_HOURS: int = 24
+
+    # Subscription Defaults
+    FREE_TIER_STORAGE_MB: int = 200
+    FREE_TIER_AGENT_LIMIT: int = 1
+    GOATED_TIER_STORAGE_MB: int = 2048
+    GOATED_TIER_AGENT_LIMIT: int = 3
+
+    # Agent API Rate Limits
+    FREE_TIER_API_REQUESTS_PER_DAY: int = 100
+    GOATED_TIER_API_REQUESTS_PER_DAY: int = 1000
+
+    @property
+    def firebase_configured(self) -> bool:
+        return all([
+            self.FIREBASE_PROJECT_ID,
+            self.FIREBASE_CLIENT_EMAIL,
+            self.FIREBASE_PRIVATE_KEY
+        ])
+
     @property
     def database_url(self) -> str:
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"

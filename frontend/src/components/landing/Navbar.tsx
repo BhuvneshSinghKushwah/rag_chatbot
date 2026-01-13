@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isAuthenticated, loading } = useAuth();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-surface-300/50">
@@ -56,10 +58,35 @@ export function Navbar() {
             </Link>
             <Link
               href="/chat"
-              className="px-4 py-2 bg-primary-400 hover:bg-primary-300 text-white font-medium rounded-lg transition-colors"
+              className="px-4 py-2 text-surface-700 hover:text-white transition-colors"
             >
               Try Demo
             </Link>
+            {loading ? (
+              <div className="w-20 h-10" />
+            ) : isAuthenticated ? (
+              <Link
+                href="/dashboard"
+                className="px-4 py-2 bg-primary-400 hover:bg-primary-300 text-white font-medium rounded-lg transition-colors"
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/login"
+                  className="px-4 py-2 text-surface-700 hover:text-white transition-colors"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/login"
+                  className="px-4 py-2 bg-primary-400 hover:bg-primary-300 text-white font-medium rounded-lg transition-colors"
+                >
+                  Sign Up
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -120,10 +147,39 @@ export function Navbar() {
               </Link>
               <Link
                 href="/chat"
-                className="px-4 py-2 bg-primary-400 hover:bg-primary-300 text-white font-medium rounded-lg transition-colors text-center"
+                className="text-surface-700 hover:text-white transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
               >
                 Try Demo
               </Link>
+              {!loading && (
+                isAuthenticated ? (
+                  <Link
+                    href="/dashboard"
+                    className="px-4 py-2 bg-primary-400 hover:bg-primary-300 text-white font-medium rounded-lg transition-colors text-center"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Dashboard
+                  </Link>
+                ) : (
+                  <>
+                    <Link
+                      href="/login"
+                      className="text-surface-700 hover:text-white transition-colors"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Sign In
+                    </Link>
+                    <Link
+                      href="/login"
+                      className="px-4 py-2 bg-primary-400 hover:bg-primary-300 text-white font-medium rounded-lg transition-colors text-center"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Sign Up
+                    </Link>
+                  </>
+                )
+              )}
             </div>
           </div>
         )}

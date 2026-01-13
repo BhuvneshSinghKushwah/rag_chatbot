@@ -15,9 +15,11 @@ from app.config import get_settings
 from app.db import init_db
 from app.db.redis import get_redis, close_redis
 from app.services.embedding import get_embedding_service, close_embedding_service
+from app.services.firebase_auth import FirebaseAuthService
 from app.api.documents import router as documents_router
 from app.api.chat import router as chat_router
 from app.api.admin import router as admin_router
+from app.api.auth import router as auth_router
 
 settings = get_settings()
 
@@ -51,6 +53,12 @@ async def lifespan(app: FastAPI):
     logger.info("Starting application")
     await init_db()
     logger.info("Database initialized")
+
+    # Initialize Firebase Auth
+    if FirebaseAuthService.initialize():
+        logger.info("Firebase Auth initialized")
+    else:
+        logger.warning("Firebase Auth not configured - authentication disabled")
 
     await get_redis()
     logger.info("Redis connected")
@@ -114,6 +122,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
+app.include_router(auth_router, prefix="/api")
 app.include_router(documents_router)
 app.include_router(chat_router)
 app.include_router(admin_router)

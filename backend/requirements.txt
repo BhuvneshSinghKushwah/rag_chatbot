@@ -36,3 +36,6 @@ aiofiles
 mem0ai
 
 einops
+
+# Firebase Authentication
+firebase-admin
